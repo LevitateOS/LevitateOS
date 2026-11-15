@@ -35,7 +35,7 @@ git -C tools/ginux fetch ../../docs/development-migration/2026-11-06/ginux.bundl
 
 These are recovery references; this command does not check out a branch or open
 a PR. `manifest.json` maps every reference to its exact object. To inspect any
-saved candidate, use its recorded commit with `git show`, or ask the next agent
+saved proposal, use its recorded commit with `git show`, or ask the next agent
 to create an isolated checkout. In particular, F02 is the local combined
 `dfebda7c29b628fc41f50635b07e8cb48d6f883a` and corrected G12 is
 `8bb50aaa50e80428ff417654d35affd468255775`. G07 remains unready and excluded from
@@ -58,7 +58,7 @@ The archive contains:
   that checkout's own Git index path. Never copy a snapshot index onto an unrelated
   working branch. The stored base objects are in ginux.bundle.
 - `evidence/ginux-contribution-preparation/` and `evidence/latest/`, with paused
-  states, receipts, failures, selected logs, candidate patches and reproduction
+  states, receipts, failures, selected logs, proposed patches and reproduction
   helpers. Absolute old paths need adaptation on the new computer; they are
   evidence of the original machine, not instructions to overwrite live paths.
 - `helpers/`, plus saved UI/Recipe untangle scripts and analysis under
@@ -98,8 +98,8 @@ records the origin verification completed after saving the source changes.
 
 All21 active origins were checked directly after the push:51 local branch heads
 are exact or already contained by origin, and all21 local tags match. The older
-hardware-compat main is safely contained by origin's newer main; no rollback was
-performed. The primary superproject and submodule checkouts were clean. Six old
+hardware-compat main is safely contained by origin's newer main; origin's history was not
+rewound. The primary superproject and submodule checkouts were clean. Six old
 Ginux worktrees deliberately retain their original raw edits/conflicts locally;
 their exact remote recovery copies were independently restored and verified.
 See `push-results.json` and `restore-verification.json` for the recorded checks.

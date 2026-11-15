@@ -4,8 +4,7 @@ Experiment, 2026-11-07. It is now a repeatable check that covers LevitateOS
 too: [testing/ginux-boot](../../testing/ginux-boot/README.md), with the
 staging and config that were here. Question: how far is Ginux from booting AcornOS's
 userspace (musl, busybox, OpenRC) with its real init as PID 1, the way Gate 9
-boots Rocky's systemd? This is the use that would let `testing/rootfs-tests`
-drop `sudo systemd-nspawn` and give AcornOS init-level tests.
+boots Rocky's systemd? This is the use that would replace `sudo systemd-nspawn` and give AcornOS init-level tests.
 
 **Answer: close.** Unmodified upstream Ginux stops at OpenRC's first shell
 pipe. With 86 lines of scratch changes (`scratch.patch`), OpenRC runs all
@@ -142,9 +141,9 @@ the program runs; that is the audit label, not a denial.
   gaps 1–7 as concrete, testable changes. Gap 2 (SIGCHLD) is a one-line
   behavior change with a clear reproduction and is worth raising on its own:
   it affects any init or supervisor that catches SIGCHLD, not only OpenRC.
-- Then `testing/rootfs-tests` can boot AcornOS (and later LevitateOS) under
-  Ginux instead of `sudo systemd-nspawn`, and recab's OpenRC detection can be
-  checked against a real boot: this experiment already produced the
+- Then AcornOS (and later LevitateOS) can boot under Ginux instead of
+  `sudo systemd-nspawn` (that is [testing/ginux-boot](../../testing/ginux-boot/README.md)),
+  and recab's OpenRC detection can be checked against a real boot: this experiment already produced the
   `/run/openrc` state and `rc-status --crashed` output it reads.
 
 ## Files

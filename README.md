@@ -2,103 +2,192 @@
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](LICENSE)
 
-**Customization from the package level.**
+This repository builds two operating systems, LevitateOS and AcornOS, and the
+tools they are made with.
 
-A Linux distribution where you maintain your own packages. Packages are Rhai
-recipes that declare how to acquire, build and install each piece of software.
-A/B slots are the default install: the running root is locked, all changes are
-made in the other root, and a changed root that fails to boot falls back to the
-last working one. A mutable (single-root) install is an explicit opt-in.
+## 1. What this is
 
-## Two sibling distros
+LevitateOS and AcornOS are independent operating systems. Their userlands are
+built from Fedora 45 RPM packages (LevitateOS) and Alpine 3.24 APK packages
+(AcornOS). Those package sets are our parts supplier and nothing more. The
+kernel (built from pinned source), the installer, the `rec*` tools, A/B booting
+and Recipe are our own. `dnf` and `apk` never run, here or on an installed
+system.
 
-LevitateOS and AcornOS are two independent operating systems built by the same
-pipeline: the same install flow, the same A/B behavior, the same recipes, and
-one release ISO each — a split-screen installer (system terminal and guide)
-that reboots into the desktop after installation. They are not based on Fedora
-or Alpine; their userlands are built from Fedora 45 RPM packages and Alpine
-3.24 APK packages respectively, which are a parts supplier only (own kernel,
-own installer, own rec* tools, no `dnf`/`apk` anywhere). They differ in the
-facts each one declares in its own `distro/variants/<id>/distro.toml`: package
-backend (Fedora RPMs or Alpine APKs), libc and init, the admin tool (sudo or
-doas), the desktop (Plasma or LXQt) and the kernel line (latest or LTS).
-`distro_contract::load` reads and validates that file; the `[profile]` section
-holds the differing facts.
+What differs is declared in each variant's `distro.toml`
+([LevitateOS](distro/variants/levitate/distro.toml),
+[AcornOS](distro/variants/acorn/distro.toml)):
 
-Each has its own purpose. LevitateOS is the daily-driver workstation: glibc and
-systemd, so software built for mainstream Linux runs. AcornOS is the small,
-strict system: musl, OpenRC and the fewest parts that do the job.
+| | LevitateOS | AcornOS |
+| --- | --- | --- |
+| Packages | Fedora RPM | Alpine APK |
+| C library | glibc | musl |
+| Init | systemd | OpenRC |
+| Admin tool | sudo | doas |
+| Desktop | Plasma | LXQt |
+| Kernel line | latest | LTS |
 
-## Working in the repository
+LevitateOS is the daily-driver workstation: software built for mainstream
+Linux runs on it. AcornOS is the small, strict system: the fewest parts that do
+the job. Each OS ships one release ISO.
 
-Everything runs through `cargo xtask`; `cargo xtask --help` is the command
-reference and [`xtask/README.md`](xtask/README.md) says what xtask owns.
-Before changing the installer, recab, Recipe, the desktop apps, or public
-wording about the OSes, read [`docs/product-handoff.md`](docs/product-handoff.md):
-it records the settled product design, the work order (upstream Ginux first),
-and the known defects.
+## 2. Recipe
 
-The current Recipe/Ginux release integration remains provisional. Its
-[release scope and acceptance queue](docs/ginux-contribution-task-list.md)
-requires both distros' base/test-install-base products through guest installer,
-installation and A/B verification on the delivered combination. Maintained
-runtime delivery and final acceptance remain open; desktop products and
-external AI-provider interoperability are outside that agreed verification scope.
+Software is acquired, built, installed and removed through Recipe
+([`tools/recipe`](tools/recipe)). There is no other package manager on either
+system.
 
-## Installing
+A recipe is a readable Rhai file that says where a program comes from, how it
+is built and what it needs. You can read it before you run it.
+Recipes that start programs run in an isolated Ginux domain. The others run on
+the host. Ginux is Greg Kurtzer's upstream project
+([`gmkurtzer/ginux`](https://github.com/gmkurtzer/ginux)), which we follow; our
+fork is [`tools/ginux`](tools/ginux).
 
-The live ISO boots into the install screen: a guide beside a shell, using the
-`rec*` install tools. The same pages are on the website and in
-[`docs/content`](docs/content).
+Every install is either for me or for everyone:
 
-## Recipes
+- For me: the program is installed for one user.
+- For everyone: the program is installed into the system. On an A/B
+  installation that change is written into the other root (see below), never
+  into the booted one.
 
-One Rhai format and one engine, [`tools/recipe`](tools/recipe), serve two consumers:
+The recipe catalog is [`recipes/`](recipes/). The recipes that build the
+operating systems themselves are in
+[`distro/builder/os-recipes/`](distro/builder/os-recipes/). Both use the same
+format: see [`tools/recipe/WRITING_RECIPES.md`](tools/recipe/WRITING_RECIPES.md)
+and [`docs/package-recipe-format.md`](docs/package-recipe-format.md).
 
-| Collection | Owner and purpose |
+Software that ships above the minimal base, the desktop included, is meant to
+be installed through Recipe too, so it can be removed or swapped like any
+other. Today it is still built into the image; see section 7.
+
+## 3. The two roots
+
+An A/B installation has two root filesystems, root A and root B
+([`tools/recab`](tools/recab)).
+
+- The booted root is locked: it is mounted read-only.
+- The other root is unlocked. System changes are written there.
+- Boot into the other root and the roles swap.
+
+`recab copy` makes the other root a copy of the booted root, which discards
+whatever was in it. `recab boot-other` starts the other root once. The boot
+default is the root that last finished starting, so a root that fails to start
+is left behind and the machine boots the previous one.
+
+A mutable installation has one root and no recab. There is no updater yet.
+
+## 4. Installing
+
+The ISO boots into the install screen: a root terminal on the left and the
+installation guide on the right. The guide offers the helper apps
+(`disk-plan`, `base-system`, `system-setup`) or the manual commands. Use one or
+the other: when a helper has done a step, the manual section for it says to
+skip it.
+
+Running the helpers is not an installed system. A system counts as installed
+when boot files and boot entries exist on the EFI partition and the
+verification has passed. The same pages are in [`docs/content`](docs/content)
+and on the website.
+
+## 5. Where things are
+
+| Path | What is there |
 | --- | --- |
-| [`distro/builder/os-recipes/`](distro/builder/os-recipes/) | The OS builder: acquire base packages, build the kernel and tools, and assemble system images and live overlays. |
-| [`recipes/`](recipes/) | User-managed software: the application catalog, starting with ripgrep. Recipe activates packages and manages updates/removal using the installed receipt. |
+| [`distro/builder`](distro/builder) | Builds products: rootfs, EROFS images, ISOs. Holds `os-recipes/` and the install screen's split pane. |
+| [`distro/contract`](distro/contract) | The variant contract: its types, the loader and the product and scenario registry. |
+| [`distro/variants`](distro/variants) | `levitate` and `acorn`: one `distro.toml`, kernel config and branding each. |
+| [`tools/recipe`](tools/recipe) | Recipe. |
+| [`tools/ginux`](tools/ginux) | Ginux, the isolation Recipe runs programs in (upstream's project, our fork). |
+| [`tools/recab`](tools/recab) | The two roots. |
+| [`tools/recstrap`](tools/recstrap), [`tools/recpart`](tools/recpart) | Install tools: extract the system and configure boot; plan and apply partitions. |
+| [`tools/recinit`](tools/recinit), [`tools/recuki`](tools/recuki), [`tools/reciso`](tools/reciso) | Build the initramfs, unified kernel images and the ISO. |
+| [`tools/recqemu`](tools/recqemu), [`tools/recguest`](tools/recguest), [`tools/recshuttle`](tools/recshuttle) | Scenario VMs under libvirt, the guest agent, and the SSH transport to a guest. |
+| [`tools/reclogin`](tools/reclogin) | The login screen (design only so far, see [`docs/reclogin.md`](docs/reclogin.md)). |
+| [`tools/gui`](tools/gui) | The Qt desktop apps: Recipe, Recab and Recdirstat (in `disk/`). |
+| [`tools/tui`](tools/tui) | The terminal apps of the live ISO and installer. |
+| [`testing/install-tests`](testing/install-tests) | Boot and install scenarios. |
+| [`testing/ginux-boot`](testing/ginux-boot) | Boots an OS root under Ginux and judges its startup. |
+| [`recipes`](recipes) | The software catalog. |
+| [`docs`](docs) | Design notes, the product handoff, `content` (live docs) and `website`. |
+| [`xtask`](xtask) | `cargo xtask`, the front door for every workflow. |
 
-The split is about who consumes the output and manages its lifetime. Both
-collections use Recipe API 2 and Ginux; there is no separate recipe language or
-execution engine. Software shipped with the OS above the minimal base —
-including the desktop environment itself — is Recipe-installed with a receipt,
-so it can be uninstalled or swapped in Recipe like anything else
-([`docs/product-handoff.md`](docs/product-handoff.md) §2.4).
+Several of these are Git submodules (see `.gitmodules`); each has its own
+README.
 
-`recipe install ripgrep` produces a verified package tree in Ginux and atomically
-activates it. `recipe update ripgrep` uses the current catalog's pinned version;
-`recipe remove ripgrep` deactivates it using the installed receipt. The OS builder
-uses `--no-activate` to consume outputs without changing its host. Package profiles
-and override recipes currently persist on shared `/var`. System-level changes go
-through Recipe into the **unlocked** other root (the booted root is locked) and
-take effect on the next boot of that root; the settled A/B contract, its current
-implementation gap, and the work order are recorded in
-[`docs/product-handoff.md`](docs/product-handoff.md) §2.2/§2.3 and §5.1.
+## 6. Working here
 
-See [`docs/package-recipe-format.md`](docs/package-recipe-format.md) for ownership
-and output semantics, and [`tools/recipe/WRITING_RECIPES.md`](tools/recipe/WRITING_RECIPES.md)
-for the shared format.
+Everything runs through `cargo xtask`; `just` has a short alias for each
+command. `cargo xtask --help` lists them. The ones you will use:
 
-## Repository layout
-
+```sh
+cargo xtask setup                         # once: QEMU tools, firmware, SSH key
+cargo xtask doctor                        # what is missing, and the command that fixes it
+cargo xtask check                         # quick checks: cargo check, generated files, TypeScript
+cargo xtask check tui                     # the terminal apps
+cargo xtask build release <distro>        # the release ISO
+cargo xtask test all <distro>             # the scenarios
+cargo xtask status <distro>               # which scenarios pass, fail or are stale
 ```
-distro/      builder (products and ISOs), contract and variants (per-distro declarations)
-recipes/     user-managed software catalog (ripgrep)
-tools/       recipe, the rec* install and boot tools, ginux (upstream build domains),
-             gui (Qt desktop apps) and tui (terminal apps for the live ISO and installer)
-testing/     install-tests (boot/install scenarios)
-docs/        content (site and live docs), website, design notes, history
-xtask/       the cargo xtask front door
-```
 
-## License
+`<distro>` is `levitate` or `acorn`. With `just`: `just check`, `just build
+...`, `just test ...`, `just website-dev`.
 
-MIT OR Apache-2.0 for LevitateOS's own code; built images contain packages
-under their own licenses. See [LICENSE](LICENSE).
+Image, kernel and ISO builds take hours. They happen only when the owner asks
+for one; a change to a declaration is done when it is edited and committed.
+Read [`AGENTS.md`](AGENTS.md) for the working rules, and
+[`docs/product-handoff.md`](docs/product-handoff.md) before changing the
+installer, recab, Recipe, the desktop apps or public wording about the OSes.
+[`xtask/README.md`](xtask/README.md) says what xtask owns.
 
-## Links
+## 7. State of things
 
-- [Website](https://levitateos.org)
-- [Documentation sources](docs/content)
+The 2026-11-15 rework is unbuilt and has not run on a machine: no image has
+been built since it, and no installed system has used it.
+
+In source, unbuilt:
+
+- recab with the locked/unlocked contract and the commands in section 3
+  (`status`, `copy`, `boot-other`, `started`, `compare`, `health`, `init`,
+  `verify-installation`, `install-unit`). Its old lifecycle and updater are
+  removed.
+- Recipe writes "for everyone" installs into the other root and, after
+  `recab copy`, writes only that part again. Checked against a scratch
+  directory standing in for the other root, not on an A/B machine.
+- recab and the Recab app reach only an A/B installation, through the boot
+  step. A mutable installation gets neither.
+- Recipe pinned to a Ginux that includes upstream's work through gates 25 and
+  26; Recipe's acceptance suite passed on it before the rework above.
+- The LevitateOS image generates its CA trust bundles; Firefox ships one
+  bookmark; the Plasma panel has the Recipe app where Discover was.
+- The agent app is removed from the desktop apps; they keep only a "Copy for
+  agent" button. The Recab app is one page. The install hub is gone; the
+  install screen is the terminal plus the guide.
+
+Settled in [`docs/product-handoff.md`](docs/product-handoff.md) but not in
+source:
+
+- Recipe-installed shipped software, the desktop included. Plasma and LXQt are
+  still built into the images.
+- An updater, for A/B and for mutable installations. Its release engineering
+  is not designed yet.
+- Purpose-made icons for the three apps.
+- Steam on LevitateOS.
+- The login screen (`tools/reclogin`).
+
+The defects recorded in section 5 of the handoff (the install's Boot step on
+both OSes among them) were seen on ISOs built before this rework. Whether the
+rework clears them is unknown until an image is built and installed.
+
+## 8. Credits and licences
+
+- Ginux is Greg Kurtzer's project, [`gmkurtzer/ginux`](https://github.com/gmkurtzer/ginux).
+  The `.hdae` skills come from his [`gmkurtzer/hdae`](https://github.com/gmkurtzer/hdae).
+- Fedora and Alpine supply the packages the two userlands are built from.
+- Our code is MIT OR Apache-2.0: [`LICENSE`](LICENSE) explains what is under
+  which licence, with [`LICENSE-MIT`](LICENSE-MIT),
+  [`LICENSE-APACHE`](LICENSE-APACHE) and the other texts in
+  [`LICENSES/`](LICENSES). Built images contain packages under their own
+  licences.
+
+Website: [levitateos.org](https://levitateos.org).
