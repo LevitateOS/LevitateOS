@@ -1,0 +1,30 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-15T20:40:00Z" },
+  "title": "reclogin login screen",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1920, "h": 1080, "title": "LevitateOS · login" },
+    "Acorn.dc.html": { "x": 2000, "y": 0, "w": 1920, "h": 1080, "title": "AcornOS · login" },
+    "LevitateWrongPassword.dc.html": { "x": 0, "y": 1200, "w": 1920, "h": 1080, "title": "LevitateOS · wrong password, Caps Lock on" },
+    "AcornOtherUser.dc.html": { "x": 2000, "y": 1200, "w": 1920, "h": 1080, "title": "AcornOS · other user, session menu open" },
+    "LevitateKeyboard.dc.html": { "x": 0, "y": 2400, "w": 1920, "h": 1080, "title": "LevitateOS · on-screen keyboard open" },
+    "AcornExpiredPassword.dc.html": { "x": 2000, "y": 2400, "w": 1920, "h": 1080, "title": "AcornOS · expired password, choosing a new one" },
+    "LevitateNoUsers.dc.html": { "x": 0, "y": 3600, "w": 1920, "h": 1080, "title": "LevitateOS · no accounts to list" },
+    "AcornGuest.dc.html": { "x": 2000, "y": 3600, "w": 1920, "h": 1080, "title": "AcornOS · guest" },
+    "LevitateReturn.dc.html": { "x": 0, "y": 4800, "w": 1920, "h": 1080, "title": "LevitateOS · returning to a logged-in user" },
+    "AcornShutDown.dc.html": { "x": 2000, "y": 4800, "w": 1920, "h": 1080, "title": "AcornOS · shut down while others are logged in" },
+    "LevitateSecondScreen.dc.html": { "x": 0, "y": 6000, "w": 1920, "h": 1080, "title": "LevitateOS · the other monitor" },
+    "AcornTextLogin.dc.html": { "x": 2000, "y": 6000, "w": 1920, "h": 1080, "title": "AcornOS · text login after three crashes" }
+  },
+  "order": [
+    "Main.dc.html", "Acorn.dc.html", "LevitateWrongPassword.dc.html", "AcornOtherUser.dc.html",
+    "LevitateKeyboard.dc.html", "AcornExpiredPassword.dc.html", "LevitateNoUsers.dc.html", "AcornGuest.dc.html",
+    "LevitateReturn.dc.html", "AcornShutDown.dc.html", "LevitateSecondScreen.dc.html", "AcornTextLogin.dc.html"
+  ],
+  "notes": {
+    "heading": { "x": 0, "y": -300, "text": "reclogin: one login screen, two systems", "kind": "title1", "maxW": 3920 }
+  },
+  "designSystems": []
+}

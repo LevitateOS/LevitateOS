@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LevitateOS login, on-screen keyboard</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1920px; height: 1080px; position: relative; overflow: hidden; background: #0D1711; color: #F2EEE4; font-family: 'Instrument Sans', Arial, sans-serif">
+<img src="/_blob/a8001a0ed75d91b2bed91dbe057d8fae" alt="" style="position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; object-fit: cover">
+<div style="position: absolute; left: 250px; top: 140px; width: 1420px; height: 800px; display: flex; flex-direction: column; justify-content: space-between">
+
+<div style="display: flex; justify-content: space-between; align-items: flex-start">
+<div style="display: flex; align-items: center; gap: 14px">
+<svg width="34" height="34" viewBox="0 0 24 24" role="img" aria-label="LevitateOS" style="color: #C7D9BA"><path d="M3.1 13.4C3.8 7.4 8.4 4.6 14.6 4.6c2.8 0 4.6-.7 6.8-2.2-.2 6.2-3.5 11.1-8.4 12.4-2.5.7-4.9.3-6.5-.8 1.9-2.5 4.2-4.2 7.4-5.7-4.1.9-7 2.7-9.3 5.4-.6.7-1.6.7-1.5-.3Z" fill="currentColor"></path><path d="M4.1 20.5c4.8-2.5 10.9-2.5 15.7-.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"></path></svg>
+<div style="font-family: 'Newsreader', Georgia, serif; font-size: 30px; letter-spacing: -0.02em">LevitateOS</div>
+</div>
+<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px">
+<div style="font-family: 'Newsreader', Georgia, serif; font-size: 52px; line-height: 1; letter-spacing: -0.03em">21:42</div>
+<div style="font-size: 14px; color: #BAC5B7">Sunday 15 November</div>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 420px 1fr; gap: 110px; align-items: start">
+<div style="display: flex; flex-direction: column; gap: 18px">
+<div style="font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #9AA89D">Who is logging in</div>
+<div style="display: flex; flex-direction: column; border-top: 1px solid #3A4B40">
+<div style="display: flex; align-items: center; gap: 18px; height: 68px; border-bottom: 1px solid #3A4B40">
+<span style="font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: #C7D9BA; width: 22px">01</span>
+<span style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #C7D9BA; color: #14221A; font-family: 'Newsreader', Georgia, serif; font-size: 22px">A</span>
+<span style="font-family: 'Newsreader', Georgia, serif; font-size: 27px; letter-spacing: -0.01em; color: #F2EEE4">Ada Lindqvist</span>
+</div>
+<button type="button" style="all: unset; box-sizing: border-box; cursor: pointer; height: 48px; display: flex; align-items: center; gap: 10px; font-size: 15px; color: #BAC5B7">
+<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"></path></svg>
+Someone else
+</button>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 22px">
+<h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-weight: 400; font-size: 56px; line-height: 1; letter-spacing: -0.03em">Good evening, <em style="color: #C7D9BA">Ada.</em></h1>
+<div style="display: flex; align-items: flex-end; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 10px; width: 560px">
+<label for="lev-kb-password" style="font-size: 12px; color: #BAC5B7">Password</label>
+<div style="display: flex; align-items: center; height: 60px; box-sizing: border-box; border: 1px solid #C7D9BA; background: #0D1711">
+<input id="lev-kb-password" type="password" value="corre" style="flex: 1; min-width: 0; height: 100%; box-sizing: border-box; padding: 0 20px; border: 0; outline: 0; background: transparent; color: #F2EEE4; font-family: 'Instrument Sans', Arial, sans-serif; font-size: 22px; letter-spacing: 0.2em">
+<button type="button" aria-label="Show password" style="all: unset; box-sizing: border-box; cursor: pointer; width: 60px; height: 100%; display: flex; align-items: center; justify-content: center; color: #BAC5B7; border-left: 1px solid #3A4B40">
+<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"></path><circle cx="12" cy="12" r="2.8"></circle></svg>
+</button>
+</div>
+</div>
+<button type="button" style="all: unset; box-sizing: border-box; cursor: pointer; height: 60px; padding: 0 34px; display: flex; align-items: center; background: #B22F27; color: #F2EEE4; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase">Log in</button>
+</div>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #3A4B40; padding-top: 18px">
+<div style="display: flex; gap: 8px">
+<sc-for list="{{row1}}" as="k" hint-placeholder-count="11">
+<button type="button" style="all: unset; box-sizing: border-box; cursor: pointer; flex: 1; height: 56px; display: flex; align-items: center; justify-content: center; border: 1px solid #3A4B40; background: #1D2D24; color: #F2EEE4; font-size: 20px">{{k.label}}</button>
+</sc-for>
+</div>
+<div style="display: flex; gap: 8px; padding: 0 30px">
+<sc-for list="{{row2}}" as="k" hint-placeholder-count="10">
+<button type="button" style="all: unset; box-sizing: border-box; cursor: pointer; flex: 1; height: 56px; display: flex; align-items: center; justify-content: center; border: 1px solid #3A4B40; background: #1D2D24; color: #F2EEE4; font-size: 20px">{{k.label}}</button>
+</sc-for>
+</div>
+<div style="display: flex; gap: 8px; padding: 0 60px">
+<sc-for list="{{row3}}" as="k" hint-placeholder-count="9">
+<button type="button" style="all: unset; box-sizing: border-box; cursor: pointer; flex: 1; height: 56px; display: flex; align-items: center; justify-content: center; border: 1px solid #3A4B40; background: #1D2D24; color: #F2EEE4; font-size: 20px">{{k.label}}</button>
+</sc-for>
+<button type="button" style="all: unset; box-sizing: border-box; cursor: pointer; width: 190px; height: 56px; display: flex; align-items: center; justify-content: center; background: #B22F27; color: #F2EEE4; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase">Enter</button>
+</div>
+<div style="display: flex; gap: 8px">
+<button type="button" aria-label="Shift" style="all: unset; box-sizing: border-box; cursor: pointer; width: 150px; height: 56px; display: flex; align-items: center; justify-content: center; border: 1px solid #3A4B40; background: #14221A; color: #BAC5B7; font-size: 15px">Shift</button>
+<sc-for list="{{row4}}" as="k" hint-placeholder-count="9">
+<button type="button" style="all: unset; box-sizing: border-box; cursor: pointer; flex: 1; height: 56px; display: flex; align-items: center; justify-content: center; border: 1px solid #3A4B40; background: #1D2D24; color: #F2EEE4; font-size: 20px">{{k.label}}</button>
+</sc-for>
+<button type="button" aria-label="Delete" style="all: unset; box-sizing: border-box; cursor: pointer; width: 150px; height: 56px; display: flex; align-items: center; justify-content: center; border: 1px solid #3A4B40; background: #14221A; color: #BAC5B7; font-size: 15px">Delete</button>
+</div>
+<div style="display: flex; gap: 8px">
+<button type="button" style="all: unset; box-sizing: border-box; cursor: pointer; width: 150px; height: 56px; display: flex; align-items: center; justify-content: center; border: 1px solid #3A4B40; background: #14221A; color: #BAC5B7; font-size: 15px">!#1</button>
+<button type="button" style="all: unset; box-sizing: border-box; cursor: pointer; width: 190px; height: 56px; display: flex; align-items: center; justify-content: center; border: 1px solid #3A4B40; background: #14221A; color: #BAC5B7; font-size: 15px">English (US)</button>
+<button type="button" aria-label="Space" style="all: unset; box-sizing: border-box; cursor: pointer; flex: 1; height: 56px; border: 1px solid #3A4B40; background: #1D2D24"></button>
+<button type="button" style="all: unset; box-sizing: border-box; cursor: pointer; width: 230px; height: 56px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid #3A4B40; background: #14221A; color: #BAC5B7; font-size: 15px">
+<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+Hide keyboard
+</button>
+</div>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1080}}'>
+class Component extends DCLogic {
+renderVals() {
+const keys = (text) => text.split('').map((label) => ({ label }));
+return {
+row1: keys('1234567890'),
+row2: keys('qwertyuiop'),
+row3: keys('asdfghjkl'),
+row4: keys('zxcvbnm,.')
+};
+}
+}
+</script>
+</body>
+</html>

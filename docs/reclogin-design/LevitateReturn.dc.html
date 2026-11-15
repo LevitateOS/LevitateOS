@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LevitateOS login, returning to a logged-in user</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1920px; height: 1080px; position: relative; overflow: hidden; background: #0D1711; color: #F2EEE4; font-family: 'Instrument Sans', Arial, sans-serif">
+<img src="/_blob/a8001a0ed75d91b2bed91dbe057d8fae" alt="" style="position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; object-fit: cover">
+<div style="position: absolute; left: 250px; top: 140px; width: 1420px; height: 800px; display: flex; flex-direction: column; justify-content: space-between">
+
+<div style="display: flex; justify-content: space-between; align-items: flex-start">
+<div style="display: flex; align-items: center; gap: 14px">
+<svg width="34" height="34" viewBox="0 0 24 24" role="img" aria-label="LevitateOS" style="color: #C7D9BA"><path d="M3.1 13.4C3.8 7.4 8.4 4.6 14.6 4.6c2.8 0 4.6-.7 6.8-2.2-.2 6.2-3.5 11.1-8.4 12.4-2.5.7-4.9.3-6.5-.8 1.9-2.5 4.2-4.2 7.4-5.7-4.1.9-7 2.7-9.3 5.4-.6.7-1.6.7-1.5-.3Z" fill="currentColor"></path><path d="M4.1 20.5c4.8-2.5 10.9-2.5 15.7-.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"></path></svg>
+<div style="font-family: 'Newsreader', Georgia, serif; font-size: 30px; letter-spacing: -0.02em">LevitateOS</div>
+</div>
+<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px">
+<div style="font-family: 'Newsreader', Georgia, serif; font-size: 52px; line-height: 1; letter-spacing: -0.03em">21:50</div>
+<div style="font-size: 14px; color: #BAC5B7">Sunday 15 November</div>
+<div style="font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #9AA89D">workstation</div>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 420px 1fr; gap: 110px; align-items: start">
+<div style="display: flex; flex-direction: column; gap: 18px">
+<div style="font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #9AA89D">Who is logging in</div>
+<div style="display: flex; flex-direction: column; border-top: 1px solid #3A4B40">
+<button type="button" aria-pressed="false" style="all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 18px; height: 68px; border-bottom: 1px solid #3A4B40">
+<span style="font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: #9AA89D; width: 22px">01</span>
+<span style="width: 40px; height: 40px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid #3A4B40; color: #BAC5B7; font-family: 'Newsreader', Georgia, serif; font-size: 22px">A</span>
+<span style="font-family: 'Newsreader', Georgia, serif; font-size: 27px; letter-spacing: -0.01em; color: #BAC5B7">Ada Lindqvist</span>
+</button>
+<button type="button" aria-pressed="true" style="all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 18px; height: 68px; border-bottom: 1px solid #3A4B40">
+<span style="font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: #C7D9BA; width: 22px">02</span>
+<span style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #C7D9BA; color: #14221A; font-family: 'Newsreader', Georgia, serif; font-size: 22px">K</span>
+<span style="font-family: 'Newsreader', Georgia, serif; font-size: 27px; letter-spacing: -0.01em; color: #F2EEE4">Kai Moreno</span>
+<span style="margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #C7D9BA"><span aria-hidden="true" style="width: 7px; height: 7px; background: #C7D9BA"></span>Logged in</span>
+</button>
+<button type="button" aria-pressed="false" style="all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 18px; height: 68px; border-bottom: 1px solid #3A4B40">
+<span style="font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: #9AA89D; width: 22px">03</span>
+<span style="width: 40px; height: 40px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid #3A4B40; color: #BAC5B7; font-family: 'Newsreader', Georgia, serif; font-size: 22px">N</span>
+<span style="font-family: 'Newsreader', Georgia, serif; font-size: 27px; letter-spacing: -0.01em; color: #BAC5B7">Noor Haddad</span>
+</button>
+<button type="button" aria-pressed="false" style="all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 18px; height: 68px; border-bottom: 1px solid #3A4B40">
+<span style="width: 22px"></span>
+<span style="width: 40px; height: 40px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid #3A4B40; color: #BAC5B7">
+<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="3.5"></circle><path d="M5 20c.8-3.6 3.5-5.5 7-5.5s6.2 1.900 7 5.500"></path></svg>
+</span>
+<span style="font-family: 'Newsreader', Georgia, serif; font-size: 27px; letter-spacing: -0.01em; color: #BAC5B7">Guest</span>
+<span style="margin-left: auto; font-size: 13px; color: #9AA89D">Nothing is kept after logout</span>
+</button>
+<button type="button" aria-pressed="false" style="all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 18px; height: 68px; border-bottom: 1px solid #3A4B40">
+<span style="width: 22px"></span>
+<span style="width: 40px; height: 40px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px dashed #3A4B40; color: #9AA89D">
+<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+</span>
+<span style="font-size: 16px; color: #BAC5B7">Other user…</span>
+</button>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 30px">
+<h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-weight: 400; font-size: 84px; line-height: 0.98; letter-spacing: -0.035em">Back to <em style="color: #C7D9BA">Kai's desktop.</em></h1>
+<div style="display: flex; flex-direction: column; gap: 12px; width: 620px; font-size: 18px; line-height: 1.5; color: #BAC5B7">
+<div>Kai is already logged in on this computer.</div>
+<div style="color: #F2EEE4">Kai's desktop asks for the password, not this screen.</div>
+<div style="display: flex; align-items: center; gap: 10px; font-size: 15px; color: #9AA89D">
+<span>Session</span>
+<span style="color: #BAC5B7">Plasma (Wayland), running since 19:10</span>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 28px">
+<button type="button" style="all: unset; box-sizing: border-box; cursor: pointer; height: 52px; padding: 0 34px; display: flex; align-items: center; background: #B22F27; color: #F2EEE4; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase">Return to Kai's desktop</button>
+</div>
+</div>
+</div>
+
+<div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #3A4B40; padding-top: 22px">
+<div style="display: flex; align-items: center; gap: 34px">
+<button type="button" style="all: unset; box-sizing: border-box; cursor: pointer; height: 44px; display: flex; align-items: center; gap: 10px; font-size: 14px; color: #BAC5B7">
+<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12"></rect><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M7.5 14h9"></path></svg>
+English (US)
+</button>
+<button type="button" style="all: unset; box-sizing: border-box; cursor: pointer; height: 44px; display: flex; align-items: center; gap: 10px; font-size: 14px; color: #BAC5B7">
+<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11M12 10.5V9a1.5 1.5 0 0 1 3 0v2M15 11.5V10.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1a5 5 0 0 1-4.2-2.3L4 14.5a1.5 1.5 0 0 1 2.5-1.7L9 15"></path></svg>
+On-screen keyboard
+</button>
+</div>
+<div style="display: flex; align-items: center; gap: 34px">
+<button type="button" style="all: unset; box-sizing: border-box; cursor: pointer; height: 44px; display: flex; align-items: center; gap: 10px; font-size: 14px; color: #BAC5B7">
+<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"></path></svg>
+Sleep
+</button>
+<button type="button" style="all: unset; box-sizing: border-box; cursor: pointer; height: 44px; display: flex; align-items: center; gap: 10px; font-size: 14px; color: #BAC5B7">
+<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"></path><path d="M20 4v5h-5"></path></svg>
+Restart
+</button>
+<button type="button" style="all: unset; box-sizing: border-box; cursor: pointer; height: 44px; display: flex; align-items: center; gap: 10px; font-size: 14px; color: #BAC5B7">
+<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9"></path><path d="M6.3 6.8a8 8 0 1 0 11.4 0"></path></svg>
+Shut down
+</button>
+</div>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1080}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

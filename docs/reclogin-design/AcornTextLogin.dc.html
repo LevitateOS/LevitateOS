@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AcornOS text login after the login screen failed</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1920px; height: 1080px; box-sizing: border-box; padding: 56px 64px; background: #0B0806; color: #CDBFAE; font-family: ui-monospace, 'SFMono-Regular', 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace; font-size: 24px; line-height: 1.5; display: flex; flex-direction: column; gap: 36px">
+<div style="color: #F2EEE4">AcornOS 1.0 (workbench) (tty1)</div>
+<div style="display: flex; flex-direction: column">
+<div style="color: #F0B866">The login screen stopped: it failed to start three times within a minute.</div>
+<div>Log in here. Your desktop is not affected.</div>
+<div>To try the login screen again: doas rc-service reclogin restart</div>
+<div>What went wrong: /var/log/reclogin.log</div>
+</div>
+<div style="display: flex; align-items: center; gap: 14px">
+<div style="color: #F2EEE4">workbench login:</div>
+<div aria-hidden="true" style="width: 14px; height: 30px; background: #F2EEE4"></div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1080}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
