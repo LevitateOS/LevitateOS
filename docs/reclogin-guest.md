@@ -283,12 +283,21 @@ Risks that remain:
 
 - **R1. AcornOS homes may be readable by everyone.** busybox `adduser -D` (used by `system-setup.sh`) makes homes 0755 as far as I know; Fedora's `useradd` makes them 0700. If so, the guest (and every other user) can read people's homes on AcornOS today. Since 2026-11-15 the setup program makes every new home 0700 on both systems (builder `14339e6`, written and not run). Homes on systems installed before that stay as they are.
 - **R2. Swap.** tmpfs pages can be written to swap. If the machine swaps to an unencrypted disk partition or file, pieces of a guest's files can stay on the disk after power loss until overwritten. Memory-only swap (zram) or encrypted swap avoids it. What the systems use for swap is not decided here.
-- **R3. Logs and crash dumps.** On LevitateOS journald keeps a per-user journal for uid 60600, and systemd-coredump may store a crashed guest program's memory. Both stay after logout, readable by root. AcornOS's syslog records the logins. "Nothing is kept" is about the guest's files and settings, not the system's own records.
+- **R3. Logs and crash dumps.** On LevitateOS journald keeps a per-user journal for uid 60600, and systemd-coredump may store a crashed guest program's memory. reclogin's cleanup removes the per-user journal files and core dumps of uid 60600 after every guest session; what journald and systemd-coredump wrote about the guest elsewhere (the system journal) stays, readable by root. AcornOS's syslog records the logins. "Nothing is kept" is about the guest's files and settings, not the system's own records.
 - **R4. Shared memory filesystems.** `/tmp` (if tmpfs), `/dev/shm` and `/run/user/60600` are memory the guest can fill outside its home's cap until logout. The home cap and `nproc` limit do not cover them.
 - **R5. Things other services keep on the guest's behalf.** Print jobs already sent finish and CUPS keeps their history (job names). A Bluetooth device paired by the guest stays paired system-wide (bluez keeps pairings in `/var/lib/bluetooth`; polkit does not guard pairing). Removable-drive mounts are cleaned; data written to the drive is not. The cleanup list in point 3 is the place to add any such service that turns up.
 - **R6. A determined local attacker with the machine.** A guest at the keyboard can still boot something else from USB if firmware allows it. Firmware passwords and disk encryption are outside reclogin.
 - **R7. Untried on both systems.** That `TerminateUser`, the `-session` PAM lines, `DenyUsers` in `sshd_config.d` and the uaccess device rules behave the same under elogind as under logind is read from documentation and package contents, not seen on a running system. The first implementation must show each on both OSes.
-- **R8. Polkit coverage is a deny list.** An action not on the list that asks for an administrator would still show an admin prompt in the guest session (see point 1).
+- **R8 (closed 2026-11-16).** The polkit rule is an allow list: the guest gets the few actions point 1 names and every other action is refused, so no administrator prompt can appear in a guest session.
+
+## What the build changed (2026-11-16)
+
+Two independent reads of the code found ways around this design, and the fixes are part of it now:
+
+- **A guest session cannot create a set-user-ID or set-group-ID file anywhere.** The kernel refuses it for the whole session. Without this, a guest could leave a program behind that runs as the guest account, and another person could use it to enter the next guest's session. A consequence: no program that needs elevated rights (`su`, `sudo`, `doas`, `passwd`) works inside a guest session.
+- **The helper that ends the guest's processes runs under a second reserved account, `reclogin-sweep` (60601),** so the guest's processes cannot stop or kill it.
+- **The cleanup also clears the guest's stored keys, its journal files and core dumps, and its `at` jobs,** and has no depth limit when it removes folders.
+- **Once per boot, before the first guest,** the cleanup searches the local file systems for set-id files owned by the guest and takes the bits away. If that search cannot finish in its time budget, the guest stays off until the next boot.
 
 ## Decisions (the owner, 2026-11-15)
 
