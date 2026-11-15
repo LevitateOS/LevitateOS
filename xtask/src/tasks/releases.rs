@@ -1,16 +1,18 @@
-//! `cargo xtask release recipe`: the standalone Recipe release. No system builds or VM runs.
+//! `cargo xtask release recipe|keygen|sign|publish`: the standalone Recipe release and the signing and publishing of system releases. No system builds or VM runs.
 use anyhow::{Result, bail};
 pub fn run(args: Vec<String>) -> Result<()> {
     match args.first().map(String::as_str) {
         Some("recipe") => super::recipe_release::run(args[1..].to_vec()),
+        Some("keygen" | "sign" | "publish") => super::release::run(&args),
         None | Some("--help" | "-h") => {
             println!(
-                "Usage: cargo xtask release recipe [ARGS]...\n\n`release recipe --help` lists its arguments."
+                "Usage: cargo xtask release recipe [ARGS]...\n\n`release recipe --help` lists its arguments.\n\n{}",
+                super::release::USAGE
             );
             Ok(())
         }
         Some(other) => bail!(
-            "unknown release command '{other}'; the one release command is `cargo xtask release recipe`"
+            "unknown release command '{other}'; the release commands are recipe, keygen, sign and publish"
         ),
     }
 }

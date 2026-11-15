@@ -1,16 +1,20 @@
 //! `base lock`: lock the packages a variant takes from its distribution base.
 //!
 //! The variant contract (`sources.rootfs_source.base`) names the release, its
-//! signing key and the packages; `[desktop].packages` names what the desktop
-//! layer adds. For an RPM variant this resolves each package and its closure
+//! signing key and the base packages; the group recipes of the public
+//! catalogue (`recipes/*.rhai`, their `SEEDS_GLIBC`/`SEEDS_MUSL` lists, see
+//! [`group_seeds`]) name what the software installed through Recipe adds. For
+//! an RPM variant this resolves each package and its closure
 //! (the requires and provides in Fedora's release and updates primary
 //! metadata, newest build of each name, no weak dependencies), checks every
 //! RPM against the repository checksum and the release's signing key; an APK
 //! variant goes through `apk_lock` (the same closure over Alpine's indexes).
-//! Either writes three locks: the base and the desktop layer (the desktop's
-//! closure minus what the base already has), which the rootfs recipes import,
-//! and the apps-build layer (what compiling the desktop apps in `tools/gui/` needs
-//! beyond the base), which only the root they are compiled in gets.
+//! Either writes three locks: the base, which the rootfs recipes import; the
+//! desktop lock (the group recipes' seeds' closure minus what the base already
+//! has), which `base groups` shares out into the recipes' pins and whose
+//! preseed fills the release medium's package cache; and the apps-build layer
+//! (what compiling the desktop apps in `tools/gui/` needs beyond the base),
+//! which only the root they are compiled in gets.
 //! Rerunning it is how a build takes the distribution's updates.
 
 use anyhow::{Context, Result, bail};
@@ -54,8 +58,9 @@ impl Rpm {
     }
 }
 
-/// Which lock: the base system's, what the desktop layer adds to it, or what
-/// compiling the desktop apps adds to the base (never in an image).
+/// Which lock: the base system's, what the group recipes add to it (no image
+/// carries it; Recipe installs it), or what compiling the desktop apps adds to
+/// the base (never in an image).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Layer {
     Base,
@@ -78,10 +83,46 @@ impl Layer {
     pub fn holds(self) -> &'static str {
         match self {
             Layer::Base => "the variant's packages and everything they need",
-            Layer::Desktop => "what the desktop packages need beyond the base lock",
+            Layer::Desktop => "what the group recipes' seeds need beyond the base lock",
             Layer::AppsBuild => "what compiling the desktop apps needs beyond the base lock",
         }
     }
+}
+
+/// Every seed the group recipes of the public catalogue (`recipes/*.rhai`)
+/// name for `backend`'s C library (`const SEEDS_GLIBC` for RPM, `const
+/// SEEDS_MUSL` for APK), each once, in file then list order: what the desktop
+/// lock resolves.
+pub fn group_seeds(root: &Path, backend: PackageBackend) -> Result<Vec<String>> {
+    let opener = match backend {
+        PackageBackend::Rpm => "const SEEDS_GLIBC = [",
+        PackageBackend::Apk => "const SEEDS_MUSL = [",
+    };
+    let dir = root.join("recipes");
+    let mut files: Vec<PathBuf> = fs::read_dir(&dir)
+        .with_context(|| format!("reading {}", dir.display()))?
+        .map(|entry| entry.map(|e| e.path()))
+        .collect::<std::io::Result<_>>()?;
+    files.retain(|f| f.extension().is_some_and(|e| e == "rhai"));
+    files.sort();
+    let mut seeds: Vec<String> = Vec::new();
+    for file in files {
+        let text = fs::read_to_string(&file).with_context(|| format!("reading {}", file.display()))?;
+        let Some(start) = text.find(opener) else { continue };
+        let rest = &text[start + opener.len()..];
+        let end = rest
+            .find("];")
+            .with_context(|| format!("{}: {opener} has no closing `];`", file.display()))?;
+        for seed in rest[..end].split('"').skip(1).step_by(2) {
+            if !seeds.iter().any(|s| s == seed) {
+                seeds.push(seed.to_string());
+            }
+        }
+    }
+    if seeds.is_empty() {
+        bail!("no group recipe in {} names a seed in {opener}...]", dir.display());
+    }
+    Ok(seeds)
 }
 
 /// The lock file the rootfs recipes import.
@@ -292,7 +333,7 @@ fn lock_rpm(root: &Path, distro: &Distro, bundle: &distro_contract::Variant, che
         primary_index(&repo, &mut newest)?;
     }
     let index = Index::new(newest);
-    let desktop_packages = &bundle.contract.desktop.packages;
+    let desktop_packages = &group_seeds(root, PackageBackend::Rpm)?;
     let assumed: HashSet<&str> = base.provided_elsewhere.iter().map(String::as_str).collect();
     let base_set = index.resolve(&base.packages, BTreeSet::new(), &assumed)?;
     let mut desktop_set = index.resolve(desktop_packages, base_set.clone(), &assumed)?;

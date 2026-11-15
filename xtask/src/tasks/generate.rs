@@ -109,7 +109,7 @@ fn write_distros(out: &mut Out, root: &Path) -> Result<()> {
             "isoFile": c.artifacts.release_iso,
             "desktop": {
                 "isoFile": c.artifacts.iso(distro_contract::ProductId::Release),
-                "displayManager": c.desktop.display_manager,
+                "recipes": c.desktop.recipes,
                 "installScreen": format!("/{}", distro_contract::install_ux::LAUNCHER),
             },
             "installedInitramfs": c.artifacts.initramfs_installed,

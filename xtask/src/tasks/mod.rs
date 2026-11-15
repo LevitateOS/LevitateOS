@@ -12,4 +12,5 @@ pub mod scenarios;
 pub mod setup;
 pub mod tui;
 
+pub mod release;
 pub mod releases;

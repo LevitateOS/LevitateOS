@@ -4,12 +4,17 @@
 # `distro_contract::registry`, the same for every variant, and every artifact
 # name (`<os_id>-x86_64-<product>.iso`, `<os_id>-live.efi`, ...) follows from
 # `os_id`.
-schema_version = 11
+schema_version = 12
 
 [identity]
 os_name = "AcornOS"
 os_id = "acornos"
 os_version = "1.0"
+# The release serial: raise it by one, by hand, for every release (installed
+# systems compare serials, never os_version), and point release_notes at that
+# release's notes. docs/release-engineering.md, section 2.
+release_serial = 1
+release_notes = "https://levitateos.org/releases/acornos/1.0"
 
 # The base facts this variant differs in (`distro_profile::Profile`). The
 # builder writes them into the image's /etc/os-release as REC_* fields, which
@@ -113,10 +118,8 @@ packages = [
   "iproute2",
   "iputils",
   "curl",
-  "networkmanager",
-  "networkmanager-cli",
-  "networkmanager-wifi",
-  "wpa_supplicant",
+  # NetworkManager and its WiFi over wpa_supplicant are the `network` group's
+  # (recipes/).
   "iw",
   "wireless-regdb",
   "pciutils",
@@ -155,27 +158,41 @@ packages = [
   "linux-firmware-other",
   "linux-firmware-nvidia",
   "sof-firmware",
+  # The seat and session manager and the policy daemon on OpenRC, which any
+  # desktop a group recipe installs logs in through.
+  "elogind",
+  "polkit-elogind",
 ]
 
-# The desktop system, the rootfs of the release product (docs/desktop.md):
-# the base packages plus these, LXQt on X11 with SDDM (LXQt runs on X11 because
-# Alpine 3.24 packages no LXQt Wayland session, lxqt-wayland-session).
-# `cargo xtask base lock acorn` locks what they need beyond the base lock; the
-# preseed downloads that desktop lock.
+# The default software set (docs/product-handoff.md 2.4): group recipes of
+# the public catalogue (recipes/), installed through Recipe into every target
+# during the installation, from the release medium, which carries these
+# recipes and every package they pin. The system image is the base above;
+# nothing here is burned into it. `cargo xtask base lock acorn` locks what the
+# group recipes' seeds need beyond the base (the desktop lock), which the
+# preseed downloads; `cargo xtask base groups acorn` writes each recipe's share
+# of it as its pins.
 [desktop]
-display_manager = "sddm"
+recipes = [
+  "lxqt", "login-screen", "qterminal", "pcmanfm-qt", "lxqt-archiver", "lximage-qt",
+  "screengrab", "pavucontrol-qt", "qalculate-qt", "mousepad", "qps", "simple-scan",
+  "firefox", "xlibre", "audio", "network", "network-ui", "bluetooth", "printing",
+  "firewall", "fonts", "fonts-office", "fonts-cjk", "spelling", "screen-reader",
+  "thumbnailers", "graphics-drivers", "filesystems", "thunderbolt", "firmware-updates",
+  "manuals", "vm-guest", "rec-apps",
+]
 preseed_recipe_script = "distro/builder/os-recipes/alpine-desktop-preseed.rhai"
 # AcornOS runs XLibre, the fork of the X.Org server (github.com/X11Libre), not
 # Alpine's xorg-server. Alpine has no XLibre package, so this recipe builds the
 # server and XLibre's libinput input driver from pinned source in the
-# apps-build root below, and the builder merges their tree into the desktop
-# system (distro/builder/src/display_server.rs). What follows from it: the
-# packages `xorg-server` and `xf86-input-libinput` are not in the desktop
-# lock, the server's run-time libraries are listed in `packages` by hand,
-# X.Org-built driver packages (xf86-video-*, xf86-input-*) cannot be added
-# (XLibre loads only modules built for its own ABI), and keeping XLibre
-# current is this project's job: the source pins in the recipe are bumped for
-# every XLibre point release, each treated as a security release.
+# apps-build root below, and the builder publishes their tree as the prebuilt
+# `display-server` (distro/builder/src/display_server.rs). The xlibre group
+# recipe carries only the server's run-time packages so far; the server
+# itself is not installed by any recipe yet. X.Org-built driver packages
+# (xf86-video-*, xf86-input-*) cannot be added (XLibre loads only modules built
+# for its own ABI), and keeping XLibre current is this project's job: the
+# source pins in the recipe are bumped for every XLibre point release, each
+# treated as a security release.
 display_server_recipe_script = "distro/builder/os-recipes/xlibre.rhai"
 # What compiling the desktop apps (tools/gui/) and the display server needs: the C++
 # compiler with the C library's headers, CMake with make, Qt's development
@@ -192,42 +209,3 @@ apps_build_packages = [
 ]
 apps_build_preseed_recipe_script = "distro/builder/os-recipes/alpine-apps-build-preseed.rhai"
 apps_build_root_recipe_script = "distro/builder/os-recipes/alpine-apps-build-root.rhai"
-packages = [
-  "lxqt-desktop", "lximage-qt", "pavucontrol-qt", "screengrab", "sddm",
-  # What the XLibre server and its libinput driver (display_server_recipe_script)
-  # need at run time, since no package depends on them for it: the libraries
-  # they link, the keymap compiler and keymaps, the fonts the server itself
-  # needs (the cursor font and "fixed"), and Mesa's EGL and GBM for glamor.
-  "xkbcomp", "xkeyboard-config", "font-cursor-misc", "font-misc-misc", "mesa-egl",
-  "mesa-gbm", "mesa-gl", "libepoxy", "libxfont2", "libxcvt", "pixman", "libdrm",
-  "libpciaccess", "libxshmfence", "nettle", "libxau", "libxdmcp", "libinput-libs",
-  "eudev-libs",
-  "eudev", "udev-init-scripts", "udev-init-scripts-openrc",
-  "mesa-dri-gallium", "elogind", "polkit-elogind", "dbus", "dbus-x11", "pipewire",
-  "wireplumber", "pipewire-pulse", "pipewire-alsa", "networkmanager", "networkmanager-wifi",
-  "network-manager-applet", "breeze-icons", "font-noto", "firefox",
-  # Mounting removable drives, trash, phones and cameras (gvfs), the keyboard
-  # layout settings, monitor settings, portals for Firefox's file dialogs, and
-  # notify-send.
-  "udisks2", "gvfs", "gvfs-mtp", "gvfs-gphoto2", "setxkbmap", "xrandr", "xdg-desktop-portal",
-  "xdg-desktop-portal-lxqt", "libnotify",
-  # Video decoding, Vulkan, firmware updates, exFAT and NTFS drives, OpenVPN.
-  "mesa-va-gallium", "intel-media-driver", "vulkan-loader", "mesa-vulkan-intel", "mesa-vulkan-ati",
-  "fwupd", "exfatprogs", "ntfs-3g", "networkmanager-openvpn",
-  # Metric-compatible fonts for documents, file thumbnails, spelling, manual
-  # pages.
-  "font-liberation", "ffmpegthumbnailer", "hunspell-en", "mandoc", "man-pages",
-  # The same desktop LevitateOS has, on AcornOS's own stack: Bluetooth,
-  # printing (CUPS, driverless printers found through Avahi), scanning,
-  # Thunderbolt, the screen reader with its speech, an on-screen keyboard,
-  # CJK fonts, the guest agents of the libvirt test VMs, the firewall and its
-  # settings, a compositor (KWin composites on LevitateOS), a calculator, a
-  # text editor, a task manager and the archive tools lxqt-archiver uses.
-  "bluez", "blueman", "cups", "cups-filters", "avahi", "system-config-printer", "sane-backends",
-  "simple-scan", "bolt", "orca", "speech-dispatcher", "espeak-ng", "onboard", "font-noto-cjk",
-  "spice-vdagent", "firewalld", "firewalld-gui", "picom", "qalculate-qt",
-  "mousepad", "qps", "unzip", "7zip",
-  # Windows and NFS shares in pcmanfm-qt, and the Adwaita cursor theme (the
-  # GTK look AcornOS takes; it had no cursor theme at all).
-  "gvfs-smb", "gvfs-nfs", "adwaita-icon-theme",
-]

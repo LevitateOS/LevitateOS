@@ -4,12 +4,17 @@
 # `distro_contract::registry`, the same for every variant, and every artifact
 # name (`<os_id>-x86_64-<product>.iso`, `<os_id>-live.efi`, ...) follows from
 # `os_id`.
-schema_version = 11
+schema_version = 12
 
 [identity]
 os_name = "LevitateOS"
 os_id = "levitateos"
 os_version = "1.0"
+# The release serial: raise it by one, by hand, for every release (installed
+# systems compare serials, never os_version), and point release_notes at that
+# release's notes. docs/release-engineering.md, section 2.
+release_serial = 1
+release_notes = "https://levitateos.org/releases/levitateos/1.0"
 home_url = "https://levitateos.org"
 
 # The base facts this variant differs in (`distro_profile::Profile`). The
@@ -144,8 +149,8 @@ packages = [
   "procps-ng",
   # Shared libraries the packages above load. The lock resolves them as
   # dependencies, so naming them is redundant.
-  # What the install docs configure: time zones under /usr/share/zoneinfo,
-  # compiled English locales, and NetworkManager with its libraries.
+  # What the install docs configure: time zones under /usr/share/zoneinfo and
+  # compiled locales. NetworkManager is the `network` group's (recipes/).
   "tzdata",
   "glibc-langpack-cs",
   "glibc-langpack-de",
@@ -160,10 +165,8 @@ packages = [
   "glibc-langpack-ru",
   "glibc-langpack-sr",
   "glibc-langpack-sv",
-  "NetworkManager",
-  # WiFi: NetworkManager's wifi plugin over wpa_supplicant, and iw.
-  "NetworkManager-wifi",
-  "wpa_supplicant",
+  # WiFi regulatory data and iw; NetworkManager's WiFi over wpa_supplicant is
+  # the `network` group's.
   "wireless-regdb",
   "iw",
   # Firmware the kernel's drivers load from /usr/lib/firmware (.xz, which the
@@ -185,51 +188,33 @@ packages = [
   "alsa-sof-firmware",
   "intel-audio-firmware",
   "cirrus-audio-firmware",
+  # pam_systemd.so: without it logind registers no session, whatever desktop
+  # a group recipe installs.
+  "systemd-pam",
 ]
 
-# The desktop system, the rootfs of the release product (docs/desktop.md):
-# the base packages plus these, KDE Plasma on Wayland with SDDM. systemd-pam is
-# required: without pam_systemd.so logind registers no session and Wayland gets
-# no seat. `cargo xtask base lock levitate` locks what they need beyond the base
-# lock; the preseed downloads that desktop lock.
+# The default software set (docs/product-handoff.md 2.4): group recipes of
+# the public catalogue (recipes/), installed through Recipe into every target
+# during the installation, from the release medium, which carries these
+# recipes and every package they pin. The system image is the base above;
+# nothing here is burned into it. `cargo xtask base lock levitate` locks what
+# the group recipes' seeds need beyond the base (the desktop lock), which the
+# preseed downloads; `cargo xtask base groups levitate` writes each recipe's
+# share of it as its pins.
 [desktop]
-display_manager = "sddm"
+recipes = [
+  "plasma", "konsole", "dolphin", "kwrite", "ark", "spectacle",
+  "plasma-systemmonitor", "kcalc", "skanlite", "drkonqi", "print-manager", "firefox",
+  "audio", "network", "network-ui", "bluetooth", "printing", "firewall", "fonts",
+  "fonts-office", "fonts-cjk", "spelling", "screen-reader", "thumbnailers",
+  "graphics-drivers", "filesystems", "thunderbolt", "manuals", "vm-guest", "rec-apps",
+]
 preseed_recipe_script = "distro/builder/os-recipes/fedora-rpm-desktop-preseed.rhai"
 # What compiling the desktop apps (tools/gui/) needs: the C++ compiler, CMake with
-# make, and Qt's development files. Locked with the desktop, so the Qt they are
-# compiled against is the Qt the desktop ships. Only the root they are compiled
-# in has these; no image does.
+# make, and Qt's development files. Locked with the desktop lock, so the Qt they
+# are compiled against is the Qt desktop-libs ships. Only the root they are
+# compiled in has these; no image does. The compiled apps are a prebuilt tree
+# (`prebuilt publish desktop-apps`), which the rec-apps recipe pins.
 apps_build_packages = ["gcc-c++", "make", "cmake", "qt6-qtbase-devel", "qt6-qtsvg-devel"]
 apps_build_preseed_recipe_script = "distro/builder/os-recipes/fedora-rpm-apps-build-preseed.rhai"
 apps_build_root_recipe_script = "distro/builder/os-recipes/fedora-rpm-apps-build-root.rhai"
-packages = [
-  "plasma-desktop", "plasma-workspace", "kwin", "sddm", "sddm-breeze", "sddm-wayland-plasma",
-  "xorg-x11-server-Xwayland", "konsole", "dolphin", "kwrite", "ark", "spectacle",
-  "plasma-systemmonitor", "plasma-nm", "plasma-pa", "powerdevil", "kscreen", "kinfocenter",
-  "kde-gtk-config", "breeze-gtk", "breeze-icon-theme", "xdg-desktop-portal-kde", "polkit-kde",
-  "kwalletmanager5", "pipewire", "pipewire-pulseaudio", "pipewire-alsa", "wireplumber",
-  "mesa-dri-drivers", "mesa-vulkan-drivers", "google-noto-sans-fonts",
-  "google-noto-sans-mono-fonts", "google-noto-color-emoji-fonts", "NetworkManager-wifi",
-  "wpa_supplicant", "firefox", "systemd-pam",
-  # Battery state and power profiles, mounting removable drives, and the
-  # wallet unlocked at login (pam_kwallet5, which Fedora's SDDM PAM file loads).
-  "upower", "power-profiles-daemon", "udisks2", "pam-kwallet",
-  # Bluetooth, printing (CUPS with driverless network and IPP-over-USB
-  # printers, found through Avahi), Intel video decoding (Mesa's VA drivers
-  # are in mesa-dri-drivers), Thunderbolt, exFAT and NTFS
-  # drives, OpenVPN, and the guest agents of the libvirt test VMs.
-  "bluez", "bluedevil", "cups", "cups-filters", "ipp-usb", "avahi", "plasma-print-manager",
-  "libva-intel-media-driver", "bolt", "plasma-thunderbolt", "exfatprogs", "ntfs-3g",
-  "NetworkManager-openvpn", "plasma-nm-openvpn", "spice-vdagent",
-  # Fonts for documents and CJK text, file thumbnails, manual pages, the
-  # screen reader.
-  "google-noto-serif-fonts", "google-noto-sans-cjk-fonts", "liberation-sans-fonts",
-  "liberation-serif-fonts", "liberation-mono-fonts", "kdegraphics-thumbnailers", "ffmpegthumbs",
-  "man-db", "orca",
-  # Orca's speech (the solver takes no weak dependencies, so the voice is
-  # named), a calculator, KDE's crash handler, scanning, and the firewall
-  # with Plasma's settings page for it.
-  "speech-dispatcher", "speech-dispatcher-espeak-ng", "espeak-ng", "kcalc", "plasma-drkonqi",
-  "sane-backends", "sane-backends-drivers-scanners", "skanlite", "firewalld", "plasma-firewall",
-  "plasma-firewall-firewalld",
-]

@@ -238,7 +238,8 @@ pub fn lock(root: &Path, distro: &Distro, bundle: &distro_contract::Variant, che
     let tmp = tempfile::tempdir()?;
     let index = fetch_index(tmp.path(), &mirror)?;
     let base_set = index.resolve(&base.packages, BTreeMap::new())?;
-    let mut desktop_set = index.resolve(&bundle.contract.desktop.packages, base_set.clone())?;
+    let seeds = super::base::group_seeds(root, PackageBackend::Apk)?;
+    let mut desktop_set = index.resolve(&seeds, base_set.clone())?;
     index.check_conflicts("base", &base_set)?;
     index.check_conflicts("base + desktop", &desktop_set)?;
     desktop_set.retain(|n, _| !base_set.contains_key(n));
@@ -258,6 +259,17 @@ pub fn lock(root: &Path, distro: &Distro, bundle: &distro_contract::Variant, che
     for (layer, set) in
         [(Layer::Base, &base_set), (Layer::Desktop, &desktop_set), (Layer::AppsBuild, &apps_build_set)]
     {
+        // The commands the layer's packages ship, by their `cmd:` provides:
+        // the base tree makes no BusyBox applet link for a command the
+        // desktop lock (the group recipes) ships.
+        let mut commands: Vec<String> = set
+            .values()
+            .flat_map(|&i| index.pkgs[i].provides.iter())
+            .filter_map(|p| p.strip_prefix("cmd:"))
+            .map(|p| name_of(p).to_string())
+            .collect();
+        commands.sort();
+        commands.dedup();
         let rows: Vec<(&str, String, String)> = set
             .iter()
             .map(|(name, &i)| row(&index.pkgs[i], &mirror).map(|(nv, url)| (name.as_str(), nv, url)))
@@ -300,7 +312,8 @@ pub fn lock(root: &Path, distro: &Distro, bundle: &distro_contract::Variant, che
         }).collect::<Vec<_>>();
         fs::write(
             &path,
-            render_lock(distro, layer, release, &mirror, (&key_name, &pem), (&tools_nv, &tools_url, &sha_of(&tools_url)), &rows)?,
+            render_lock(distro, layer, release, &mirror, (&key_name, &pem), (&tools_nv, &tools_url, &sha_of(&tools_url)), &rows)?
+                + render_commands(&commands).as_str(),
         )
         .with_context(|| format!("writing {}", path.display()))?;
         println!("wrote {} ({} packages, {changes} changed)", rel(root, &path), rows.len());
@@ -429,4 +442,20 @@ fn render_lock(
     }
     text.push_str("    ]\n}\n");
     Ok(text)
+}
+
+/// The lock's `commands()`: what its packages ship as commands (their `cmd:`
+/// provides). The base tree makes no BusyBox applet link for a command the
+/// desktop lock ships.
+fn render_commands(commands: &[String]) -> String {
+    let mut text = String::from(
+        "\n// The commands these packages ship (their `cmd:` provides); the base tree\n\
+         // makes no BusyBox applet link for a command the desktop lock ships.\n\
+         fn commands() {\n    [\n",
+    );
+    for command in commands {
+        text.push_str(&format!("        \"{command}\",\n"));
+    }
+    text.push_str("    ]\n}\n");
+    text
 }

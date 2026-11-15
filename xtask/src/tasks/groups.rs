@@ -31,6 +31,14 @@
 //! `desktop-libs` package) without the group declaring that dependency, or
 //! when the base and the groups together differ from today's base and desktop
 //! locks in any package or version.
+//!
+//! A glibc group may also name 32-bit seeds (`const SEEDS_I686`): no lock
+//! holds an i686 build (the locks are x86_64/noarch), so those come from
+//! Fedora's release and updates repositories; see [`add_i686`]. Only then does
+//! this read the network. The i686 packages are pinned with the group's share
+//! but stay out of the comparison with the locks, which still covers exactly
+//! the locked packages; they are listed on their own, and `--check` then also
+//! follows the repositories (a newer i686 build there makes the pins stale).
 
 use anyhow::{Context, Result, bail};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -107,6 +115,11 @@ struct Group {
     seeds_by_libc: BTreeMap<&'static str, Vec<String>>,
     deps: Vec<String>,
     about_libc: Vec<String>,
+    /// `const SEEDS_I686`, as `NAME.i686`: 32-bit seeds, from Fedora's
+    /// repositories (see [`add_i686`]). Empty when generating for musl.
+    added: Vec<String>,
+    /// The `SEEDS_I686` list whatever is being generated, for the libc check.
+    added_glibc: Vec<String>,
 }
 
 pub fn groups(distro: &Distro, check: bool) -> Result<()> {
@@ -134,11 +147,17 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
     };
     eprintln!("[step] Check {} locked packages against {}", rows.len(), rel(&root, &cache));
     let files = cached_files(&cache, &rows)?;
-    let (universe, meta) = match backend {
-        PackageBackend::Rpm => rpm_universe(&rows, &files, &base_contract.provided_elsewhere)?,
-        PackageBackend::Apk => apk_universe(&rows, &files)?,
+    let (universe, meta, locked_rpms) = match backend {
+        PackageBackend::Rpm => {
+            let (u, m, r) = rpm_universe(&rows, &files, &base_contract.provided_elsewhere)?;
+            (u, m, r)
+        }
+        PackageBackend::Apk => {
+            let (u, m) = apk_universe(&rows, &files)?;
+            (u, m, BTreeMap::new())
+        }
     };
-    let locked: BTreeMap<String, Locked> = rows
+    let mut locked: BTreeMap<String, Locked> = rows
         .iter()
         .map(|row| {
             let (bytes, license, seed) = meta[&row.name].clone();
@@ -150,7 +169,7 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
     let mut problems: Vec<String> = Vec::new();
     let present: BTreeMap<&str, &Group> = groups
         .iter()
-        .filter(|g| g.name == SHARED || !g.seeds.is_empty())
+        .filter(|g| g.name == SHARED || !g.seeds.is_empty() || !g.added.is_empty())
         .map(|g| (g.name.as_str(), g))
         .collect();
     if !present.contains_key(SHARED) {
@@ -162,7 +181,7 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
         let mut want: Vec<&str> = g
             .seeds_by_libc
             .iter()
-            .filter(|(_, s)| !s.is_empty() || g.name == SHARED)
+            .filter(|(l, s)| !s.is_empty() || g.name == SHARED || (**l == "glibc" && !g.added_glibc.is_empty()))
             .map(|(l, _)| *l)
             .collect();
         want.sort();
@@ -431,7 +450,7 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
     // out of [desktop] since the lock was written) is not part of today's
     // set: it is named, and `base lock` drops it.
     let mut listed: Vec<String> = base_contract.packages.clone();
-    listed.extend(bundle.contract.desktop.packages.iter().cloned());
+    listed.extend(base::group_seeds(&root, backend)?);
     let needed = universe.resolve(&listed, &BTreeSet::new())?;
     let orphans: Vec<&Row> = rows.iter().filter(|r| !needed.contains(&r.name)).collect();
     let today: BTreeMap<String, String> =
@@ -460,6 +479,38 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
         }
     }
 
+    // The i686 packages (SEEDS_I686): resolved after the locked share-out is
+    // final, so they never move a locked package, and kept out of the
+    // comparison with the locks above.
+    let added: BTreeMap<String, BTreeSet<String>> = if present.values().any(|g| !g.added.is_empty()) {
+        let found = add_i686(
+            &release_of(&base_contract.release)?,
+            &present,
+            &order,
+            &base_set,
+            &assigned,
+            &locked_rpms,
+            &base_contract.provided_elsewhere,
+            &mut problems,
+        )?;
+        for (name, extra) in &found.locked {
+            locked.insert(name.clone(), extra.clone());
+        }
+        found.sets
+    } else {
+        BTreeMap::new()
+    };
+    let added_count: usize = added.values().map(BTreeSet::len).sum();
+    for (g, set) in &added {
+        for p in set {
+            let l = locked[p].license.to_ascii_lowercase();
+            if l.contains("proprietary") || l.contains("nonfree") || l.contains("non-free") {
+                problems.push(format!("{g}: {p} is licensed {:?}", locked[p].license));
+            }
+        }
+        assigned.get_mut(g.as_str()).unwrap().extend(set.iter().cloned());
+    }
+
     // The OS facts a group's configuration needs (its name, website, desktop
     // and palettes), from the variant contract: a public recipe cannot read
     // the root it is installed into, so they are written in.
@@ -470,7 +521,9 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
     let mut stale = Vec::new();
     for g in &groups {
         let set = assigned.get(g.name.as_str());
-        let block = render_block(distro, backend, release, &pinned_on, &base_lock, &desktop_lock, set, &locked);
+        let extra = added.get(&g.name);
+        let block =
+            render_block(distro, backend, release, &pinned_on, &base_lock, &desktop_lock, set, extra, &locked);
         let mut text = rewrite(&g.text, libc, &block)
             .with_context(|| format!("rewriting {}", rel(&root, &g.path)))?;
         text = replace_block(&text, &format!("GENERATED OS FACTS {libc}"), &os_facts)?;
@@ -517,6 +570,22 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
         let set = &assigned[name];
         total += set.len();
         println!("  {:<22} {:>5} {:>9.1}  {}", name, set.len(), mib(set), present[name].deps.join(" "));
+    }
+    total -= added_count;
+    if added_count > 0 {
+        println!(
+            "  i686, from Fedora {}'s release and updates repositories (in the counts above, \
+             not in the comparison with the locks):",
+            base_contract.release
+        );
+        for (g, set) in &added {
+            println!(
+                "    {g}: {} package(s), {:.1} MiB: {}",
+                set.len(),
+                mib(set),
+                set.iter().map(String::as_str).collect::<Vec<_>>().join(" ")
+            );
+        }
     }
     let lacking: Vec<&str> = groups.iter().filter(|g| !present.contains_key(g.name.as_str())).map(|g| g.name.as_str()).collect();
     if !lacking.is_empty() {
@@ -622,7 +691,11 @@ fn cached_files(cache: &Path, rows: &[Row]) -> Result<Vec<PathBuf>> {
 type Meta = BTreeMap<String, (u64, String, bool)>;
 
 /// The RPMs' own requires, provides and files, read from their headers.
-fn rpm_universe(rows: &[Row], files: &[PathBuf], assumed: &[String]) -> Result<(Universe, Meta)> {
+fn rpm_universe(
+    rows: &[Row],
+    files: &[PathBuf],
+    assumed: &[String],
+) -> Result<(Universe, Meta, BTreeMap<String, base::Rpm>)> {
     let out = Command::new("rpm")
         .args(["-qp", "--nosignature", "--nodigest", "--qf"])
         .arg("@@%{NAME}\t%{EPOCHNUM}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\t%{LICENSE}\n[R %{REQUIRENAME}\n][P %{PROVIDENAME}\n][F %{FILENAMES}\n]")
@@ -692,7 +765,352 @@ fn rpm_universe(rows: &[Row], files: &[PathBuf], assumed: &[String]) -> Result<(
             bail!("{} holds {}, its lock row says {}", row.file_name(), rpm.nevra(), row.nv);
         }
     }
-    Ok((Universe::Rpm { index: base::Index::new(pkgs), assumed: assumed.to_vec() }, meta))
+    let rpms = pkgs.clone();
+    Ok((Universe::Rpm { index: base::Index::new(pkgs), assumed: assumed.to_vec() }, meta, rpms))
+}
+
+/// What [`add_i686`] found: each group's i686 packages, and what the pin
+/// blocks need to know about each.
+struct Added {
+    sets: BTreeMap<String, BTreeSet<String>>,
+    locked: BTreeMap<String, Locked>,
+}
+
+/// The Fedora release number of the variant's base.
+fn release_of(release: &str) -> Result<String> {
+    release.parse::<u32>().with_context(|| format!("base.release {release:?} is not a Fedora release number"))?;
+    Ok(release.to_string())
+}
+
+/// A group's 32-bit packages (`const SEEDS_I686`), from Fedora's release and
+/// updates repositories, since no lock holds an i686 build. They are resolved
+/// over the base, the group's own locked share, and the locked shares and
+/// i686 packages of every group it declares, from a universe of exactly
+/// today's locked builds plus the repositories' i686 builds, so a locked
+/// package always satisfies what it can. What else they need must already be
+/// beneath the group: a locked package another group owns is named with that
+/// owner to declare; an x86_64/noarch package no lock holds is named to be
+/// seeded in SEEDS_GLIBC, so `base lock` locks it (and checks its signature)
+/// like every other 64-bit package. An i686 build whose x86_64 twin is locked
+/// is taken at the twin's very version (the two share their non-library
+/// files, which must be identical); when the repositories no longer have that
+/// version, the locks are named as behind them. Bytes and licence come from
+/// the repositories' metadata (checked against repomd.xml; the RPMs' own
+/// signatures are not checked here, the SHA-256 pins are what Recipe checks);
+/// an i686 package's var/ is never kept as a state seed (the 32-bit libraries
+/// have none of their own).
+#[allow(clippy::too_many_arguments)]
+fn add_i686(
+    release: &str,
+    present: &BTreeMap<&str, &Group>,
+    order: &[&str],
+    base_set: &BTreeSet<String>,
+    assigned: &BTreeMap<&str, BTreeSet<String>>,
+    locked_rpms: &BTreeMap<String, base::Rpm>,
+    assumed: &[String],
+    problems: &mut Vec<String>,
+) -> Result<Added> {
+    let mirror = "https://dl.fedoraproject.org/pub/fedora/linux";
+    let mut repo = RepoBuilds::default();
+    for url in [
+        format!("{mirror}/releases/{release}/Everything/x86_64/os/"),
+        format!("{mirror}/updates/{release}/Everything/x86_64/"),
+    ] {
+        eprintln!("[step] Read {url} (i686 packages)");
+        read_repo(&url, &mut repo)?;
+    }
+
+    // The universe: today's locked builds, the repositories' x86_64/noarch
+    // builds of every other name (only so that needing one can be named), and
+    // one i686 build per name.
+    let mut pkgs: BTreeMap<String, base::Rpm> = locked_rpms.clone();
+    let mut info: BTreeMap<String, (u64, String)> = BTreeMap::new();
+    for (name, (rpm, size, license)) in &repo.native {
+        if !pkgs.contains_key(name) {
+            pkgs.insert(name.clone(), rpm.clone());
+            info.insert(name.clone(), (*size, license.clone()));
+        }
+    }
+    let mut twin_problems: BTreeMap<String, String> = BTreeMap::new();
+    for (name, builds) in &repo.i686 {
+        let vr = |r: &base::Rpm| format!("{}:{}-{}", r.epoch, r.version, r.release);
+        // Its twin: the locked x86_64 build, else the repositories' own.
+        let twin_locked = locked_rpms.contains_key(name);
+        let twin = locked_rpms.get(name).or_else(|| repo.native.get(name).map(|(r, _, _)| r));
+        let pick = match twin.filter(|t| t.arch != "noarch") {
+            Some(t) => match builds.iter().find(|(b, _, _)| vr(b) == vr(t)) {
+                Some(b) => b,
+                None => {
+                    twin_problems.insert(
+                        format!("{name}.i686"),
+                        format!(
+                            "{name}.i686: {} {name} at {}, Fedora's repositories have the i686 build only at {}; \
+                             the two must be the same version: run cargo xtask base lock levitate, then this again",
+                            if twin_locked { "today's lock has" } else { "the repositories have" },
+                            vr(t),
+                            builds.iter().map(|(b, _, _)| vr(b)).collect::<Vec<_>>().join(", ")
+                        ),
+                    );
+                    builds.last().unwrap()
+                }
+            },
+            None => builds.last().unwrap(),
+        };
+        let (rpm, size, license) = pick;
+        let key = format!("{name}.i686");
+        let mut rpm = rpm.clone();
+        rpm.name = key.clone();
+        info.insert(key.clone(), (*size, license.clone()));
+        pkgs.insert(key, rpm);
+    }
+    let index = base::Index::new(pkgs.clone());
+    let assumed: HashSet<&str> = assumed.iter().map(String::as_str).collect();
+
+    let owner_of = |p: &str| -> String {
+        assigned.iter().find(|(_, s)| s.contains(p)).map(|(g, _)| g.to_string()).unwrap_or_else(|| "nobody".into())
+    };
+    let mut sets: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for name in order {
+        let g = present[name];
+        if g.added.is_empty() {
+            continue;
+        }
+        let mut bad = false;
+        for s in &g.added {
+            if !pkgs.contains_key(s) {
+                problems.push(format!(
+                    "{name}: SEEDS_I686 names {}, which has no i686 build in Fedora {release}'s release and updates repositories",
+                    s.trim_end_matches(".i686")
+                ));
+                bad = true;
+            }
+        }
+        if bad {
+            continue;
+        }
+        let declared = transitive_deps(present, name);
+        let mut under = base_set.clone();
+        under.extend(assigned[name].iter().cloned());
+        for d in &declared {
+            under.extend(assigned.get(d).into_iter().flatten().cloned());
+            under.extend(sets.get(*d).into_iter().flatten().cloned());
+        }
+        let closure = index.resolve(&g.added, under.clone(), &assumed)?;
+        let mut mine = BTreeSet::new();
+        for p in closure.difference(&under) {
+            if locked_rpms.contains_key(p) {
+                problems.push(format!(
+                    "{name}: its i686 packages need {p}, a locked package of {}, without declaring it in deps",
+                    owner_of(p)
+                ));
+            } else if !p.ends_with(".i686") {
+                problems.push(format!(
+                    "{name}: its i686 packages need {p}, which no lock holds; name it in this group's SEEDS_GLIBC \
+                     and run cargo xtask base lock levitate, then this again"
+                ));
+            } else if let Some((other, _)) = sets.iter().find(|(_, s)| s.contains(p)) {
+                problems.push(format!(
+                    "{p} is needed by the i686 packages of both {other} and {name}; one of them declares the other"
+                ));
+            } else {
+                if let Some(why) = twin_problems.get(p) {
+                    problems.push(why.clone());
+                }
+                mine.insert(p.clone());
+            }
+        }
+        sets.insert(name.to_string(), mine);
+    }
+
+    let mut locked = BTreeMap::new();
+    for p in sets.values().flatten() {
+        let rpm = &pkgs[p];
+        let (bytes, license) = info[p].clone();
+        locked.insert(
+            p.clone(),
+            Locked {
+                row: Row {
+                    name: p.clone(),
+                    nv: format!("{}-{}-{}.{}", p.trim_end_matches(".i686"), rpm.version, rpm.release, rpm.arch),
+                    url: rpm.url.clone(),
+                    sha256: rpm.sha256.clone(),
+                },
+                bytes,
+                license,
+                seed: false,
+            },
+        );
+    }
+    Ok(Added { sets, locked })
+}
+
+/// One build from a repository's primary metadata: the build, its package
+/// size and its licence.
+type RepoBuild = (base::Rpm, u64, String);
+
+/// What [`read_repo`] keeps.
+#[derive(Default)]
+struct RepoBuilds {
+    /// x86_64/noarch: the newest build of each name (the updates repository,
+    /// read after the release one, replaces the release build).
+    native: BTreeMap<String, RepoBuild>,
+    /// i686: every build of each name, release builds first.
+    i686: BTreeMap<String, Vec<RepoBuild>>,
+}
+
+/// Read a repository's primary metadata (checked against repomd.xml) into
+/// `out`. `base lock` reads the same metadata for x86_64/noarch only and
+/// without sizes or licences, which is why this reads it again.
+fn read_repo(repo: &str, out: &mut RepoBuilds) -> Result<()> {
+    let tmp = tempfile::tempdir()?;
+    let repomd_path = tmp.path().join("repomd.xml");
+    curl(&format!("{repo}repodata/repomd.xml"), &repomd_path)?;
+    let repomd = fs::read_to_string(&repomd_path)?;
+    let section = repomd
+        .split("<data ")
+        .find(|s| s.starts_with("type=\"primary\""))
+        .context("repomd.xml lists no primary index")?;
+    let after = |text: &str, open: &str, close: char| -> Option<String> {
+        let start = text.find(open)? + open.len();
+        Some(text[start..].split(close).next()?.to_string())
+    };
+    let href = after(section, "<location href=\"", '"').context("primary index has no location")?;
+    let sha = after(section, "<checksum type=\"sha256\">", '<').context("primary index has no sha256 checksum")?;
+    let index = tmp.path().join("primary");
+    curl(&format!("{repo}{href}"), &index)?;
+    if sha256_file(&index)? != sha {
+        bail!("{repo}{href} does not match the checksum in repomd.xml");
+    }
+    let decompress = match href.rsplit('.').next() {
+        Some("zst") => "zstd",
+        Some("gz") => "gzip",
+        Some("xz") => "xz",
+        other => bail!("unexpected primary index compression {other:?}"),
+    };
+    let mut child = Command::new(decompress)
+        .arg("-dc")
+        .arg(&index)
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .with_context(|| format!("running {decompress}"))?;
+    parse_repo(std::io::BufReader::new(child.stdout.take().unwrap()), repo, out)?;
+    if !child.wait()?.success() {
+        bail!("decompressing {href} failed");
+    }
+    Ok(())
+}
+
+fn parse_repo(reader: impl std::io::BufRead, repo: &str, out: &mut RepoBuilds) -> Result<()> {
+    use quick_xml::events::Event;
+
+    let unescape = |s: &str| s.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&amp;", "&");
+    let mut xml = quick_xml::Reader::from_reader(reader);
+    let mut buf = Vec::new();
+    let mut current: Option<RepoBuild> = None;
+    let mut field: Option<&'static str> = None;
+    let mut deps = "";
+    loop {
+        match xml.read_event_into(&mut buf)? {
+            Event::Start(e) | Event::Empty(e) => {
+                let attr = |key: &[u8]| {
+                    e.attributes()
+                        .flatten()
+                        .find(|a| a.key.as_ref() == key)
+                        .map(|a| unescape(&String::from_utf8_lossy(&a.value)))
+                };
+                match e.name().as_ref() {
+                    b"package" => {
+                        current = Some((
+                            base::Rpm {
+                                name: String::new(),
+                                epoch: "0".into(),
+                                version: String::new(),
+                                release: String::new(),
+                                arch: String::new(),
+                                url: String::new(),
+                                sha256: String::new(),
+                                provides: Vec::new(),
+                                requires: Vec::new(),
+                            },
+                            0,
+                            String::new(),
+                        ))
+                    }
+                    b"rpm:provides" => deps = "provides",
+                    b"rpm:requires" => deps = "requires",
+                    b"rpm:recommends" | b"rpm:suggests" | b"rpm:supplements" | b"rpm:enhances" | b"rpm:conflicts"
+                    | b"rpm:obsoletes" => deps = "",
+                    b"rpm:entry" => {
+                        if let (Some((rpm, _, _)), Some(n)) = (current.as_mut(), attr(b"name")) {
+                            match deps {
+                                "provides" => rpm.provides.push(n),
+                                "requires" if !n.starts_with("rpmlib(") => rpm.requires.push(n),
+                                _ => {}
+                            }
+                        }
+                    }
+                    b"file" => field = Some("file"),
+                    b"name" => field = Some("name"),
+                    b"arch" => field = Some("arch"),
+                    b"rpm:license" => field = Some("license"),
+                    b"checksum" => field = (attr(b"type").as_deref() == Some("sha256")).then_some("sha256"),
+                    b"version" => {
+                        if let Some((rpm, _, _)) = current.as_mut() {
+                            rpm.epoch = attr(b"epoch").unwrap_or_else(|| "0".into());
+                            rpm.version = attr(b"ver").unwrap_or_default();
+                            rpm.release = attr(b"rel").unwrap_or_default();
+                        }
+                    }
+                    b"size" => {
+                        if let Some((_, size, _)) = current.as_mut() {
+                            *size = attr(b"package").and_then(|s| s.parse().ok()).unwrap_or(0);
+                        }
+                    }
+                    b"location" => {
+                        if let (Some((rpm, _, _)), Some(href)) = (current.as_mut(), attr(b"href")) {
+                            rpm.url = format!("{repo}{href}");
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Event::Text(t) => {
+                if let (Some(f), Some((rpm, _, license))) = (field, current.as_mut()) {
+                    let text = unescape(&String::from_utf8_lossy(&t));
+                    match f {
+                        "name" => rpm.name = text,
+                        "arch" => rpm.arch = text,
+                        "sha256" => rpm.sha256 = text,
+                        "file" => rpm.provides.push(text),
+                        "license" => *license = text,
+                        _ => {}
+                    }
+                }
+            }
+            Event::End(e) => {
+                field = None;
+                if matches!(e.name().as_ref(), b"rpm:provides" | b"rpm:requires") {
+                    deps = "";
+                }
+                if e.name().as_ref() == b"package"
+                    && let Some(build) = current.take()
+                    && !build.0.sha256.is_empty()
+                {
+                    match build.0.arch.as_str() {
+                        "x86_64" | "noarch" => {
+                            out.native.insert(build.0.name.clone(), build);
+                        }
+                        "i686" => out.i686.entry(build.0.name.clone()).or_default().push(build),
+                        _ => {}
+                    }
+                }
+            }
+            Event::Eof => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+    Ok(())
 }
 
 /// The APKs' own dependencies, provides and install_if, from their .PKGINFO.
@@ -817,7 +1235,14 @@ fn read_groups(dir: &Path, libc: &str) -> Result<Vec<Group>> {
         let musl = need("const SEEDS_MUSL = [")?;
         let deps = need("let deps = [")?;
         let about_libc = need("    libc: [")?;
+        // Optional: only a group that takes packages beyond the locks has it.
+        let added_glibc: Vec<String> = literal_list(&text, "const SEEDS_I686 = [")
+            .unwrap_or_default()
+            .into_iter()
+            .map(|s| format!("{s}.i686"))
+            .collect();
         let seeds = if libc == "glibc" { glibc.clone() } else { musl.clone() };
+        let added = if libc == "glibc" { added_glibc.clone() } else { Vec::new() };
         groups.push(Group {
             name,
             path,
@@ -826,6 +1251,8 @@ fn read_groups(dir: &Path, libc: &str) -> Result<Vec<Group>> {
             seeds_by_libc: BTreeMap::from([("glibc", glibc), ("musl", musl)]),
             deps,
             about_libc,
+            added,
+            added_glibc,
         });
     }
     if groups.is_empty() {
@@ -877,6 +1304,7 @@ fn render_block(
     base_lock: &Path,
     desktop_lock: &Path,
     set: Option<&BTreeSet<String>>,
+    added: Option<&BTreeSet<String>>,
     locked: &BTreeMap<String, Locked>,
 ) -> String {
     let libc = libc_of(backend);
@@ -906,13 +1334,21 @@ fn render_block(
                  // share of the {what} in {} and {} ({from}ed on\n\
                  // {pinned_on}): {} packages, {bytes} bytes. Licences are each package's own.\n\
                  const {k}_PINNED_ON = \"{pinned_on}\";\n\
-                 const {k}_PINNED_BYTES = {bytes};\n\
-                 // [name, file, URL, SHA-256, bytes, licence, var/ kept as state seeds]\n\
-                 const {k}_PINS = [\n",
+                 const {k}_PINNED_BYTES = {bytes};\n",
                 file(base_lock),
                 file(desktop_lock),
                 set.len(),
             ));
+            if let Some(added) = added.filter(|a| !a.is_empty()) {
+                let i686 = added.iter().filter(|p| p.ends_with(".i686")).count();
+                text.push_str(&format!(
+                    "// {i686} of them are i686 builds (SEEDS_I686), which no lock holds: those Fedora\n\
+                     // {release}'s release and updates repositories held when this was written, each\n\
+                     // at the version of its locked x86_64 twin.\n"
+                ));
+            }
+            text.push_str("// [name, file, URL, SHA-256, bytes, licence, var/ kept as state seeds]\n");
+            text.push_str(&format!("const {k}_PINS = [\n"));
             for p in set {
                 let l = &locked[p];
                 text.push_str(&format!(
@@ -958,7 +1394,10 @@ fn rewrite(text: &str, libc: &str, block: &str) -> Result<String> {
     };
     let dates = [string_const("RPM_PINNED_ON"), string_const("APK_PINNED_ON")];
     let version = dates.iter().max().cloned().unwrap_or_default().replace('-', ".");
-    let bytes = number_const("RPM_PINNED_BYTES").max(number_const("APK_PINNED_BYTES"));
+    // A recipe that also downloads something besides its packages (steam:
+    // Valve's launcher) says how much in OTHER_DOWNLOAD_BYTES.
+    let bytes = number_const("RPM_PINNED_BYTES").max(number_const("APK_PINNED_BYTES"))
+        + number_const("OTHER_DOWNLOAD_BYTES");
     // Room for the largest build, rounded up to whole MiB.
     let limit = bytes.div_ceil(1 << 20).max(1) << 20;
     if !version.is_empty() {

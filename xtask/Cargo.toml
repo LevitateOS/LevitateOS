@@ -40,3 +40,6 @@ flate2 = { workspace = true }
 sha1 = "0.10"
 md-5 = "0.10"
 rpm = { version = "0.30", default-features = false, features = ["payload", "gzip-compression"] }
+# `release keygen|sign|publish`: Ed25519 signing of the release manifest.
+ed25519-dalek = "2"
+base64 = "0.22"

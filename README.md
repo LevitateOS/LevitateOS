@@ -57,9 +57,9 @@ operating systems themselves are in
 format: see [`tools/recipe/WRITING_RECIPES.md`](tools/recipe/WRITING_RECIPES.md)
 and [`docs/package-recipe-format.md`](docs/package-recipe-format.md).
 
-Software that ships above the minimal base, the desktop included, is meant to
-be installed through Recipe too, so it can be removed or swapped like any
-other. Today it is still built into the image; see section 7.
+Software that ships above the minimal base, the desktop included, is
+installed through Recipe too, so it can be removed or swapped like any other.
+The installer installs the default set; see section 7 for what has run.
 
 ## 3. The two roots
 
@@ -75,7 +75,8 @@ whatever was in it. `recab boot-other` starts the other root once. The boot
 default is the root that last finished starting, so a root that fails to start
 is left behind and the machine boots the previous one.
 
-A mutable installation has one root and no recab. There is no updater yet.
+A mutable installation has one root and no recab; it is updated by the
+Updater app (`recupdate apply`).
 
 ## 4. Installing
 
@@ -104,7 +105,8 @@ and on the website.
 | [`tools/recinit`](tools/recinit), [`tools/recuki`](tools/recuki), [`tools/reciso`](tools/reciso) | Build the initramfs, unified kernel images and the ISO. |
 | [`tools/recqemu`](tools/recqemu), [`tools/recguest`](tools/recguest), [`tools/recshuttle`](tools/recshuttle) | Scenario VMs under libvirt, the guest agent, and the SSH transport to a guest. |
 | [`tools/reclogin`](tools/reclogin) | The login screen (design only so far, see [`docs/reclogin.md`](docs/reclogin.md)). |
-| [`tools/gui`](tools/gui) | The Qt desktop apps: Recipe, Recab and Recdirstat (in `disk/`). |
+| [`tools/gui`](tools/gui) | The Qt desktop apps: Recipe, Recab, Recdirstat (in `disk/`) and Updater. |
+| [`tools/recupdate`](tools/recupdate) | Checks for, downloads and (on a mutable installation) applies a release. |
 | [`tools/tui`](tools/tui) | The terminal apps of the live ISO and installer. |
 | [`testing/install-tests`](testing/install-tests) | Boot and install scenarios. |
 | [`testing/ginux-boot`](testing/ginux-boot) | Boots an OS root under Ginux and judges its startup. |
@@ -142,43 +144,58 @@ installer, recab, Recipe, the desktop apps or public wording about the OSes.
 
 ## 7. State of things
 
-The 2026-11-15 rework is unbuilt and has not run on a machine: no image has
-been built since it, and no installed system has used it.
+Everything written since 2026-11-15 is unbuilt and has not run on a machine:
+no image has been built since, no installed system has used it, and by the
+owner's rule nothing was run to prove it. It compiles; that is all that was
+checked.
 
 In source, unbuilt:
 
 - recab with the locked/unlocked contract and the commands in section 3
   (`status`, `copy`, `boot-other`, `started`, `compare`, `health`, `init`,
-  `verify-installation`, `install-unit`). Its old lifecycle and updater are
-  removed.
-- Recipe writes "for everyone" installs into the other root and, after
-  `recab copy`, writes only that part again. Checked against a scratch
-  directory standing in for the other root, not on an A/B machine.
-- recab and the Recab app reach only an A/B installation, through the boot
-  step. A mutable installation gets neither.
+  `verify-installation`, `install-unit`, `update`). Its old lifecycle and
+  updater are removed.
+- Shipped software is installed through Recipe. The image holds only the
+  base. The desktop, Firefox, audio, network, printing and the rest are group
+  recipes ([`recipes/`](recipes/)) with their own configuration, and the
+  installer installs each OS's default set (`[desktop].recipes` in
+  `distro.toml`) from a package cache on the install medium. Each group has a
+  receipt and can be removed.
+- Recipe writes "for everyone" installs into the other root on an A/B
+  installation and into the one root on a mutable one.
+- Releases and updates, as designed in
+  [`docs/release-engineering.md`](docs/release-engineering.md): a signed
+  manifest per release, `recupdate` (check, download, daily notice), `recab
+  update` for A/B installations, `recupdate apply` and the Updater app for
+  mutable ones, "Check for updates" in every app, and
+  `cargo xtask release keygen|sign|publish`. The base is an entry Recipe owns,
+  and system groups change only with a release.
+- Steam for LevitateOS (`steam`, with the 32-bit libraries in `lib32`).
+- recab and the Recab app reach only an A/B installation, the Updater app
+  only a mutable one.
 - Recipe pinned to a Ginux that includes upstream's work through gates 25 and
-  26; Recipe's acceptance suite passed on it before the rework above.
+  26; Recipe's acceptance suite passed on it before the work above.
 - The LevitateOS image generates its CA trust bundles; Firefox ships one
   bookmark; the Plasma panel has the Recipe app where Discover was.
-- Recipe, Recab and Recdirstat have their own icons.
+- Recipe, Recab, Recdirstat and the Updater have their own icons.
 - The agent app is removed from the desktop apps; they keep only a "Copy for
-  agent" button. The Recab app is one page. The install hub is gone; the
-  install screen is the terminal plus the guide.
+  agent" button. The install hub is gone; the install screen is the terminal
+  plus the guide.
 
-Settled in [`docs/product-handoff.md`](docs/product-handoff.md) but not in
-source:
+Not there yet:
 
-- Recipe-installed shipped software, the desktop included. Plasma and LXQt are
-  still built into the images.
-- An updater, for A/B and for mutable installations. Its design is approved
-  ([`docs/release-engineering.md`](docs/release-engineering.md)); none of it is
-  written.
-- Steam on LevitateOS.
+- A release signing key. Until `cargo xtask release keygen` has been run and
+  its public key committed to `distro/keys/release/`, an image trusts no
+  release.
+- The repository `LevitateOS/releases` that releases are published to.
+- A recipe for NVIDIA's proprietary driver.
 - The login screen (`tools/reclogin`).
 
 The defects recorded in section 5 of the handoff (the install's Boot step on
-both OSes among them) were seen on ISOs built before this rework. Whether the
-rework clears them is unknown until an image is built and installed.
+both OSes among them) were seen on ISOs built before this work. Whether it
+clears them is unknown until an image is built and installed. A system
+installed before releases existed cannot be updated; it is installed again
+from a release ISO.
 
 ## 8. Credits and licences
 

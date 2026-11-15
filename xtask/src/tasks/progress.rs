@@ -295,7 +295,7 @@ fn earlier_median(root: &Path, state: &State, step: &timeline::StepRef) -> Optio
     Some((median, seconds.len()))
 }
 
-/// `part system-desktop > preparing the system tree > recipe install x.rhai`
+/// `part system > preparing the system tree > recipe install x.rhai`
 /// (without the build itself, the first step).
 fn step_path(state: &State) -> String {
     let names: Vec<&str> = state.steps.iter().filter(|step| step.kind != "run").map(|step| step.name.as_str()).collect();

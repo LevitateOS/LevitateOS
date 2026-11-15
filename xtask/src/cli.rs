@@ -157,7 +157,7 @@ fn after_help() -> String {
         "Typical loop, for a distro (<distro>: {}):
   cargo xtask setup                       once: QEMU tools, firmware, SSH key
   cargo xtask build kernel <distro> --prebuilt
-  cargo xtask build release <distro>
+  cargo xtask build release <distro>      also writes the update release next to the ISO
   cargo xtask test all <distro>
   cargo xtask status <distro>
   cargo xtask progress [<distro>]         while an OS build runs: step, count, rate, ETA
@@ -179,7 +179,9 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Cmd {
-    /// `release recipe` builds the standalone Recipe release (see `release recipe --help`).
+    /// `release recipe` builds the standalone Recipe release (see `release recipe --help`);
+    /// `release keygen|sign|publish` sign and publish the system release that
+    /// `build release <distro>` wrote next to its ISO (see `release --help`).
     #[command(disable_help_flag = true)]
     Release {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
@@ -362,8 +364,8 @@ pub enum BuildCmd {
     RootfsSource {
         #[arg(value_parser = DistroParser)]
         distro: Distro,
-        /// The desktop lock's packages instead, which release builds
-        /// the desktop system from (beside the base lock's).
+        /// The desktop lock's packages instead: what the group recipes pin
+        /// beyond the base, which fills the release medium's package cache.
         #[arg(long)]
         desktop: bool,
         /// Download it again even if it is present.

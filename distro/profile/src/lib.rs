@@ -91,9 +91,11 @@ fact! {
 }
 
 fact! {
-    /// Which system an image is: the base system, or the base system with
-    /// the variant's desktop. Unlike the profile, it is a fact of the image,
-    /// not of the variant: a variant builds both.
+    /// Which system an installer medium installs: the base system alone, or
+    /// the base system with the variant's default software set (its
+    /// `[desktop].recipes`, installed through Recipe during the installation).
+    /// Every image is the base system; the flavour is a fact of the medium,
+    /// not of the image: the release medium carries the default set.
     Flavour { Base => "base", Desktop => "desktop" }
 }
 
@@ -105,18 +107,6 @@ impl Desktop {
             Desktop::Plasma => "plasma",
             Desktop::Lxqt => "lxqt",
         }
-    }
-}
-
-impl Flavour {
-    /// The image's `REC_FLAVOUR` line of `/etc/os-release`, ending in a newline.
-    pub fn os_release_line(self) -> String {
-        format!("{REC_FLAVOUR}={}\n", self.as_str())
-    }
-
-    /// The flavour in `os_release` (the text of an `/etc/os-release`).
-    pub fn from_os_release(os_release: &str) -> Result<Self, ProfileError> {
-        os_release_fact(os_release, REC_FLAVOUR)
     }
 }
 
@@ -144,8 +134,8 @@ pub const ADMIN_GROUP: &str = "wheel";
 
 /// The groups a desktop session's user is in besides [`ADMIN_GROUP`], for the
 /// devices and services it uses (graphics, input, sound, networks, printers,
-/// scanners, cameras); a user joins those the image has. The live desktop's
-/// user and every user recsetup makes on a desktop system get them.
+/// scanners, cameras); a user joins those the system has. Every user recsetup
+/// makes on a system with a desktop gets them.
 pub const DESKTOP_SESSION_GROUPS: &[&str] =
     &["video", "input", "audio", "netdev", "plugdev", "lpadmin", "scanner", "camera"];
 
@@ -185,8 +175,6 @@ pub const REC_PRIVILEGE: &str = "REC_PRIVILEGE";
 pub const REC_DESKTOP: &str = "REC_DESKTOP";
 pub const REC_KERNEL_LINE: &str = "REC_KERNEL_LINE";
 pub const REC_APPEARANCE: &str = "REC_APPEARANCE";
-/// The image's [`Flavour`]; written beside the profile's fields.
-pub const REC_FLAVOUR: &str = "REC_FLAVOUR";
 
 /// A variant's base facts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
