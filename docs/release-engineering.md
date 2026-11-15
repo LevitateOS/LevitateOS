@@ -185,6 +185,12 @@ Recipe alone and Recipe replaces its own files.
 5. **The signing key is one Ed25519 key in a file on the owner's machine.**
 6. **App buttons show the system release** that carries the newer app. Apps
    are not published or updated on their own.
+7. **System groups change only with a release.** Each release carries its own
+   copy of the group recipes (desktop, audio, printing, Steam's libraries,
+   ...), in the base at `/usr/lib/recipe/release-recipes/`, and a system uses
+   that copy: to install a group later, and to decide that nothing newer is
+   offered between releases. The public catalog never updates a system group
+   on an installed system. Apps and tools keep updating from the catalog.
 
 ## 9. Order of work
 
@@ -210,6 +216,7 @@ Files:
 | Channel pointer | `https://raw.githubusercontent.com/LevitateOS/releases/main/channels/<os>/stable.json` and `.sig` |
 | Fetched release | `/var/cache/recupdate/<serial>/` holding `release.json`, `release.json.sig`, `base.tar.zst`, `boot.tar.zst`, `recipes.tar.zst` |
 | Last daily check | `/var/lib/recupdate/available.json` (world-readable; the answer of the last `check`) |
+| The release's group recipes | `/usr/lib/recipe/release-recipes/<name>.rhai` (base files; the same recipes as `recipes.tar.zst`) |
 
 Manifest additions to section 2: `"schema": 1`, and `recipes` is an archive
 like the others: `{ "url", "sha256", "size", "revision" }`. It holds the group
