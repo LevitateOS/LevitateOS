@@ -11,10 +11,12 @@ Copyright (c) 2024-2026 LevitateOS Contributors
 
 All LevitateOS source code is dual-licensed under MIT and Apache-2.0.
 You may choose either license. See LICENSE-MIT and LICENSE-APACHE.
+Full texts of the other licenses named below (BSD-2-Clause, GPL-2.0,
+GPL-3.0, LGPL-2.1) are in the LICENSES/ folder.
 
 This includes:
   - Rust crates (distro/*, tools/*, testing/*, xtask)
-  - TypeScript packages (docs/content, docs/website, tui/*)
+  - TypeScript packages (docs/content, docs/website, tools/tui/*)
 
 Contributions are accepted under the same dual license (inbound = outbound).
 

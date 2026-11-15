@@ -72,3 +72,18 @@ NetworkManager/wpa_supplicant, BlueZ, PipeWire/WirePlumber, Avahi, CUPS, firewal
 - **ModemManager and PackageKit exist as libraries/UI only, with no daemon** in either rootfs — WWAN UI and Discover/PackageKit-style backends are currently dead. Fix by packaging decision (enable the upstream daemon or drop the dead UI), not by a rec\* port.
 - **`levitate-agent`/recab-gui binaries** are present in the Levitate image with no systemd unit, autostart, or D-Bus activation found — dead binary vs install-time activation is unresolved.
 - **Nothing here is live-boot proven.** Exact upstream D-Bus names/paths/sockets and activation (especially Acorn D-Bus-spawned udisks2/fwupd/UPower under dbus-daemon without systemd) need one real boot of each distro before any port is scheduled.
+
+## Replacing more upstream userland (2026-11-15, follow-up)
+
+Question asked: how much more of the Fedora/Alpine userland can be replaced with our own rec* code, so we depend on those distros as little as possible? Answer: the realistic wins are at the edges, in three groups.
+
+**Worth replacing with our own (small, bounded):**
+
+- **SDDM → reclogin** — the biggest remaining upstream runtime piece with a rec* successor; already planned (see `docs/reclogin.md`).
+- **iio-sensor-proxy** and **power-profiles-daemon** — the two ports ranked above (after qemu-guest-agent, done as recguest): tiny, stable D-Bus surfaces; read-only claims or reversible sysfs writes only.
+
+**Do not rewrite — stop burning them into the image instead:** `htop`, `smartmontools`, `hdparm`, `pciutils`/`usbutils`, `less`, `vim`, `curl`, and similar standard tools are fine upstream. The improvement is not a rec* rewrite; it is shipping them Recipe-installed (system scope, into the unlocked root) so they are removable — the §2.4 rule in `docs/product-handoff.md`. Zero new code to maintain, same independence win for the user.
+
+**Never replace (the dependency correctly stays):** systemd/OpenRC (either PID 1), glibc/musl, bash/coreutils, NetworkManager/wpa_supplicant, PipeWire/WirePlumber, BlueZ, CUPS, chrony, D-Bus itself, and the rest of the “Explicit reject list” above. Replacing these does not make the OS more independent in any useful sense; it makes us maintainers of an init system, a libc, and a network stack forever, for no user-visible gain.
+
+End state this points at: our kernel, installer, rec* tools, login screen, guest agent, and Recipe on top, with Fedora/Alpine supplying the big commodity userland (init, libc, network, audio) as verified packages. The upstream dependency shrinks at the edges, not at the core — deliberately.
