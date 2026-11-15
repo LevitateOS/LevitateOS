@@ -179,7 +179,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Cmd {
-    /// Publish existing signed x86_64 releases, refresh metadata or verify delivery (no OS builds). `release recipe` builds the standalone Recipe release (see `release recipe --help`).
+    /// `release recipe` builds the standalone Recipe release (see `release recipe --help`).
     #[command(disable_help_flag = true)]
     Release {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
@@ -271,7 +271,7 @@ pub enum Cmd {
     /// `cargo xtask tui <APP> [ARGS]...` runs the app in this terminal (it needs one). First
     /// it installs the root JavaScript workspace and builds the Rust tools the app's manifest
     /// lists, which go first on PATH: these are the real tools, so disk-plan's apply really
-    /// partitions and recab-tui's actions really change boot entries. ARGS go to the app;
+    /// partitions. ARGS go to the app;
     /// `cargo xtask tui <APP> --help` prints its own flags and keys.
     ///
     /// To try an app's cases by hand without touching anything real, add `--stand-ins`: the
@@ -376,7 +376,7 @@ pub struct ProductBuild {
     pub product: ProductId,
     pub distros: DistroSelection,
     /// `release build --exact`: reuse only what byte-identical Recipe and
-    /// Ginux built (implied when the release is signed).
+    /// Ginux built.
     pub exact: bool,
     /// Compile our own tools and the TUI binary instead of reusing or downloading
     /// prebuilts (an exact build does so anyway).
@@ -388,7 +388,7 @@ fn exact_arg() -> Arg {
     Arg::new("exact")
         .long("exact")
         .action(clap::ArgAction::SetTrue)
-        .help("Release build: reuse only what byte-identical Recipe and Ginux built (implied when signed)")
+        .help("Release build: reuse only what byte-identical Recipe and Ginux built")
 }
 
 /// The `--no-prebuilt` flag of every product build.
@@ -399,7 +399,7 @@ fn no_prebuilt_arg() -> Arg {
         .help("Compile our own tools and the TUI binary instead of reusing or downloading prebuilts")
 }
 
-/// "The test-install-base ISO (input of the test-install-base, install and ab-update scenarios)".
+/// "The test-install-base ISO (input of the test-install-base and install scenarios)".
 fn product_about(product: ProductId) -> String {
     let scenarios: Vec<&str> = product.scenarios().map(ScenarioId::key).collect();
     let list = match scenarios.split_last() {
@@ -497,7 +497,7 @@ pub enum PrebuiltCmd {
 
 #[derive(Args, Clone)]
 pub struct PrebuiltArgs {
-    /// `tools` (a tool package), `tui` (`install-tui`, `system-tui`), `desktop-apps` (the Qt apps; the name is the distro) or `display-server` (the X server compiled from source, XLibre on AcornOS; the name is the distro).
+    /// `tools` (a tool package), `tui` (`install-tui`), `desktop-apps` (the Qt apps; the name is the distro) or `display-server` (the X server compiled from source, XLibre on AcornOS; the name is the distro).
     #[arg(value_parser = ["tools", "tui", "desktop-apps", "display-server"])]
     pub family: String,
     /// A tool package (recpart, recstrap, recab, levitate-recipe, install-split-pane), a TUI binary, or for `desktop-apps` and `display-server` the distro id.
@@ -622,13 +622,6 @@ pub struct ScenarioArtifacts {
 pub struct TestArgs {
     #[command(flatten)]
     pub artifacts: ScenarioArtifacts,
-    /// Public candidate metadata descriptor; no local server, signing key or duplicate payload media.
-    #[arg(long, value_name = "JSON", conflicts_with = "update_fixture")]
-    pub public_update: Option<PathBuf>,
-    /// Existing RECAB_P13 ISO with signed feed, public source policy and native origin helper.
-    /// Install uses its policy before sealing; ab-update uses it as its newer update input.
-    #[arg(long, value_name = "ISO")]
-    pub update_fixture: Option<PathBuf>,
     /// A scenario, or all of them.
     #[arg(value_parser = Choices(test_selections))]
     pub scenario: TestSelection,
@@ -641,7 +634,7 @@ pub struct TestArgs {
     #[arg(long)]
     pub json: bool,
     /// The layout install installs, and the install run the installed-system
-    /// scenarios boot (ab-update needs ab).
+    /// scenarios boot (other-root needs ab).
     #[arg(long, value_enum, default_value_t = recpart::InstallMode::Ab)]
     pub mode: recpart::InstallMode,
     #[command(flatten)]

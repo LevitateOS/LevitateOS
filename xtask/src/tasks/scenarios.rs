@@ -106,9 +106,9 @@ pub fn test(args: TestArgs) -> Result<()> {
             .into_iter()
             .filter(|scenario| scenario.in_test_all())
             .filter(|scenario| {
-                // ab-update updates an A/B install; `all` leaves it out of other modes.
+                // other-root needs an A/B install; `all` leaves it out of other modes.
                 let skip =
-                    *scenario == ScenarioId::AbUpdate && args.mode != recpart::InstallMode::Ab;
+                    *scenario == ScenarioId::OtherRoot && args.mode != recpart::InstallMode::Ab;
                 if skip {
                     eprintln!(
                         "skipping {}: it needs --mode {}",
@@ -123,8 +123,6 @@ pub fn test(args: TestArgs) -> Result<()> {
     };
     let options = RunOptions {
         install_mode: args.mode,
-        update_fixture: args.update_fixture.clone(),
-        public_update: args.public_update.clone(),
         flavour: args.artifacts.flavour,
         release_run: args.artifacts.release_run.clone(),
         install_run: args.artifacts.install_run.clone(),

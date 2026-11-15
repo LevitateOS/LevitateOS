@@ -70,7 +70,7 @@ NetworkManager/wpa_supplicant, BlueZ, PipeWire/WirePlumber, Avahi, CUPS, firewal
 ### Gaps flagged (packaging decisions, not ports)
 
 - **ModemManager and PackageKit exist as libraries/UI only, with no daemon** in either rootfs — WWAN UI and Discover/PackageKit-style backends are currently dead. Fix by packaging decision (enable the upstream daemon or drop the dead UI), not by a rec\* port.
-- **`levitate-agent`/recab-gui binaries** are present in the Levitate image with no systemd unit, autostart, or D-Bus activation found — dead binary vs install-time activation is unresolved.
+- **recab-gui binaries** are present in the Levitate image with no systemd unit, autostart, or D-Bus activation found — dead binary vs install-time activation is unresolved.
 - **Nothing here is live-boot proven.** Exact upstream D-Bus names/paths/sockets and activation (especially Acorn D-Bus-spawned udisks2/fwupd/UPower under dbus-daemon without systemd) need one real boot of each distro before any port is scheduled.
 
 ## Replacing more upstream userland (2026-11-15, follow-up)

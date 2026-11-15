@@ -130,24 +130,6 @@
         "typescript": "^5.9.2",
       },
     },
-    "tools/tui/apps/runtime/recab-tui": {
-      "name": "@levitate/recab-tui",
-      "version": "0.1.0",
-      "bin": {
-        "recab-tui": "./src/main.tsx",
-      },
-      "dependencies": {
-        "@levitate/docs-content": "workspace:*",
-        "@levitate/tui-kit": "workspace:*",
-        "ink": "^6.8.0",
-        "react": "^19.2.0",
-      },
-      "devDependencies": {
-        "@types/bun": "^1.2.17",
-        "@types/react": "^19.2.0",
-        "typescript": "^5.9.2",
-      },
-    },
     "tools/tui/kit/core": {
       "name": "@levitate/tui-kit",
       "version": "0.3.0",
@@ -375,8 +357,6 @@
     "@levitate/install-hub": ["@levitate/install-hub@workspace:tools/tui/apps/install/install-hub"],
 
     "@levitate/install-state": ["@levitate/install-state@workspace:tools/tui/kit/install-state"],
-
-    "@levitate/recab-tui": ["@levitate/recab-tui@workspace:tools/tui/apps/runtime/recab-tui"],
 
     "@levitate/system-setup": ["@levitate/system-setup@workspace:tools/tui/apps/install/system-setup"],
 

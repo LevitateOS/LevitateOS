@@ -16,7 +16,7 @@ through a single-threaded ptrace supervisor:
 |---|---|---|---|
 | **Tools**: `recpart`; `recstrap`, `recchroot`, `recfstab`, `recsetup`; `recab`; `recipe`; `install-split` | `os-recipes/install-tools.rhai`, called per binary by `build_tool_tree` (`distro/builder/src/recipe/tools.rs`) | the crate's offline source closure (`prepare_tool_source`), static musl target | once per **binary and init system**: eight compiles per distro (the recstrap crate four times), and both distros compile separately |
 | **TUI binary**: the install screen and guide | `os-recipes/tui-binary.rhai` with `bun-toolchain.rhai` | the TUI's JavaScript source closure, the libc target | per libc |
-| **Desktop apps**: `recipe-gui`, `recab-gui`, `disk-gui`, `levitate-agent` | `fedora-rpm-apps-build-root.rhai` / `alpine-apps-build-root.rhai` (unpack 130–280 packages into a build root), then `desktop-apps.rhai` (CMake, `g++`) | `gui/`, the distro's apps-build lock (its Qt) | per distro |
+| **Desktop apps**: `recipe-gui`, `recab-gui`, `disk-gui` | `fedora-rpm-apps-build-root.rhai` / `alpine-apps-build-root.rhai` (unpack 130–280 packages into a build root), then `desktop-apps.rhai` (CMake, `g++`) | `gui/`, the distro's apps-build lock (its Qt) | per distro |
 
 Recipe's cache identity included the Ginux launcher's digest until 2026-11-11,
 so every Ginux or Recipe change, which happens here daily, recompiled all three

@@ -134,7 +134,6 @@ graphical front-end beside the command line.
   There is no live user. On OpenRC the sddm service's conf.d makes its
   start_post wait for the greeter succeed, so an autologin boot of the
   installed system leaves no failed service.
-- `recab stage` refuses an image of the other flavour unless `--change-flavour`.
 - `cargo xtask test desktop-boot <id>` boots it in 6 GiB (it is not in
   `test all`: its ISO is a build of its own).
 
@@ -157,12 +156,7 @@ The plan below is what the prototypes taught.
   holds tty1 and ttyS0; the display manager does not start in the live
   session. The overlay's OpenRC service list (`live-overlay.rhai`) only allows
   sshd/networking/dhcpcd.
-- **A/B**: current `recab stage` checks the flavour and requires
-  `--change-flavour` to switch deliberately. It still replaces the inactive
-  system. The required update lifecycle must preserve local changes and updates
-  in one prepared continuation, in either direction, with equivalent initial
-  A/B systems. See [recab's contract](../tools/recab/REQUIREMENTS.md) for what
-  remains missing.
+- **A/B**: the booted root is locked and the other root is unlocked, where changes are made. See [recab's contract](../tools/recab/REQUIREMENTS.md).
 - **Sizes**: libvirt VMs have 4 GiB RAM with a 50 % tmpfs upper; recstrap's
   free-space precheck is 2 GiB. Both need raising for the desktop.
 - **Kernel**: both kconfigs start from `x86_64_defconfig` (evdev on). The

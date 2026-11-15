@@ -1,5 +1,13 @@
 # The three desktop apps: what the UX lacks
 
+> **2026-11-15: the agent subsystem was removed** (`product-handoff.md`, section 3).
+> `levitate-agent`, Activity, Settings, the agent status in the window, the
+> prompt and hand-over pages, "Let the agent fix it", "Ask for software" and the
+> hand-over and set-aside of Recdirstat no longer exist. The apps now have one
+> agent-related thing, a "Copy for agent" button on failure and output views.
+> Every finding below that is about the agent, Activity, Settings, the helper or
+> a hand-over describes what was, and is void; the rest stands.
+
 Every gap found on 2026-11-10 in `gui/recipe` ("Recipe"), `gui/recab`
 ("Recab") and `gui/disk` ("Recdirstat"): missing actions, pages, tabs, states and
 feedback. It is a list of findings and of what they say about a redesign. It

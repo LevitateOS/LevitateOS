@@ -17,8 +17,9 @@ testing/ginux-boot/ginux-boot.sh levitate --rootfs ROOTFS --ginux GINUX_CHECKOUT
 ```
 
 - `--rootfs`: the product's `rootfs-source`, from a test-install-base release
-  (`.artifacts/out/<distro>/releases/test-install-base/<run>/rootfs-source`), which
-  carries recab. It is copied and never changed.
+  (`.artifacts/out/<distro>/releases/test-install-base/<run>/rootfs-source`). It
+  is copied and never changed; the copy gets the release's recab from the
+  `live-overlay` beside it (recab is on the live medium, not in the rootfs).
 - `--ginux`: a Ginux checkout that contains the revision `ginux-boot.sh` names
   (`ginux_rev`). The script builds it.
 - `--timeout`: seconds the boot may take (recab's `--timeout`); the instance

@@ -19,7 +19,7 @@ use crate::cli::Distro;
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Tools {
     /// This checkout's builds of the binaries the manifest lists: disk-plan's apply
-    /// really partitions and recab-tui's actions really change boot entries.
+    /// really partitions.
     Real,
     /// The manifest's stand-ins (`inspect.path`) first, one for every binary it lists,
     /// so nothing real is reached; stand-ins that defer what nothing recorded to the

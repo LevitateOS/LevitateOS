@@ -24,4 +24,3 @@ bun.lockb
 !.claude/skills
 
 # Transient local publisher lock; signed history remains versioned.
-/release/updates/site/**/.index.lock

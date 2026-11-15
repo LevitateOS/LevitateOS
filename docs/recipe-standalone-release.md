@@ -160,10 +160,9 @@ writing its own.
 
 1. **Package `recipe-gui` alone.** `gui/recipe` with `kit/`, its menu entry
    and its polkit action, depending on the Recipe package.
-   `levitate-agent` is optional.
-2. **Without an agent.** When `levitate-agent` is missing, "Ask for software"
-   and repair say so in one sentence and point to the way forward. Check this;
-   it has not been seen yet.
+2. **No agent inside.** The window has no agent of its own (the agent subsystem
+   was removed): failure views have "Copy for agent", which only copies text for
+   the person's own agent.
 3. **Qt comes from the host** (decision 5). Build the window once per distro
    family against that family's Qt. Check whether the 6.5 floor can drop to
    6.4.

@@ -60,6 +60,11 @@ for _ in 1 2 3 4 5 6 7 8; do
 done
 [ -f "$init" ] && [ -x "$init" ] || die "$rootfs/sbin/init does not resolve to an executable in the rootfs"
 
+# The probe asks recab for the verdict. recab is on the live medium, not in the
+# system rootfs: take the release's own, from the overlay beside rootfs-source.
+recab=$(dirname "$rootfs")/live-overlay/usr/bin/recab
+[ -f "$recab" ] && [ -x "$recab" ] || die "$recab is missing: --rootfs must be the rootfs-source of a test-install-base release, whose live-overlay carries recab"
+
 # read_gaps FILE: the names of FILE's `gap NAME REASON` lines, one per line;
 # blank and `#` lines are skipped, and any other line is an error.
 read_gaps() {
@@ -95,6 +100,7 @@ trap 'exit 130' INT TERM
 
 echo "ginux-boot: staging $rootfs"
 sudo cp -a "$rootfs" "$root"
+sudo install -D -m 0755 "$recab" "$root/usr/bin/recab"
 sudo sh "$here/stage.sh" "$root" "$os" "$timeout" "/$out"
 
 # quote ARG...: the arguments as one sh command line, each single-quoted.

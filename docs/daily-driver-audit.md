@@ -39,7 +39,7 @@ Each area sits on one of five rungs:
 | Settings that must outlive a reboot (Wi-Fi, password, printer) | 0 on an A/B install | 0 on an A/B install |
 | Everyday apps beyond the browser | 0 | 0 |
 | Adding desktop software (Recipe) | 0 for desktop programs; 2 for command-line tools, outside an image | same, and upstream desktop builds cannot run on musl yet |
-| The three maintenance apps (Recipe, System, Disk) | 1, against stand-ins | 1, and the agent helper lacks `gdbus` |
+| The three maintenance apps (Recipe, System, Disk) | 1, against stand-ins | 1, against stand-ins |
 | System updates reaching an installed computer | 0 (no channel, no keys) | 0 |
 | Disk encryption, Secure Boot, microcode | 0 | 0 |
 
@@ -208,8 +208,8 @@ Usable without them, but a person would notice within a week.
   backup or snapshot of `/home`.
 - The three maintenance apps have never run in an image or against the real
   `recipe` and `recab`. Of 231 listed gaps, 61 are done, 91 partly, 79 open
-  (`gui-ux-gaps.md`). Everything that hands work to an agent fails until the
-  person installs one.
+  (`gui-ux-gaps.md`). The apps have no agent of their own; their failure views
+  copy text for the person's own agent.
 - No PDF viewer, media player, office suite or mail program in either image.
   Firefox stands in for PDFs.
 - No fingerprint reader support, no input methods (decided), no Plymouth, no
@@ -241,7 +241,6 @@ Usable without them, but a person would notice within a week.
 - No screen sharing (no screen-cast portal on X11 here), no night light, no
   clipboard manager, no power profiles, no HiDPI setting.
 - Mousepad is installed but is not the default for text files.
-- The agent helper needs `gdbus`, which neither Alpine lock has.
 - `networkmanager-wwan` is in the lock without ModemManager (mobile broadband
   is decided as unsupported; the package is dead weight).
 
