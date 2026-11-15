@@ -91,7 +91,7 @@ Must be identical: the greeter binary and interaction model; avatar list + last-
 7. **Last session: remembered per user.**
 8. **Switch user: logged-in users are marked in the list.** Choosing one returns to their running session, where their desktop's own lock screen asks for the password. reclogin never draws an unlock prompt.
 9. **Sign-in: password only in the first version.** Whatever PAM asks is still shown, so a method an administrator sets up gets its prompts; only the password is shipped and checked.
-10. **Guest session: yes.** A "Guest" entry starts a temporary account that is wiped at logout. How that account is made and removed is to be designed (it is the one piece of account machinery here).
+10. **Guest session: yes.** One fixed account `guest` with a home in memory that is thrown away at logout, no password, started only by reclogin. Its design and the owner's seven decisions on it are in `docs/reclogin-guest.md`.
 11. **Several monitors: the login on the primary one;** the others show the same background without controls.
 12. **Language: no picker.** The screen uses the system's language; each person's desktop uses their own after login.
 

@@ -1,6 +1,6 @@
 # reclogin: the Guest Account
 
-Status: **design awaiting the owner's verdict. Nothing is built.** No code, recipe, PAM file or account exists for it. This document settles decision 10 of `docs/reclogin.md` ("Guest session: yes … how that account is made and removed is to be designed") on paper only.
+Status: **design; the owner answered its seven questions on 2026-11-15 (see "Decisions" at the end). Nothing is built.** No code, recipe, PAM file or account exists for it. This document settles decision 10 of `docs/reclogin.md` ("Guest session: yes … how that account is made and removed is to be designed") on paper only.
 
 The login screen already shows the entry in its visual draft: **Guest**, with the line **"Nothing is kept after logout"**. This document says what has to be true for that line to be honest, on LevitateOS and on AcornOS, with one reclogin program.
 
@@ -290,12 +290,12 @@ Risks that remain:
 - **R7. Untried on both systems.** That `TerminateUser`, the `-session` PAM lines, `DenyUsers` in `sshd_config.d` and the uaccess device rules behave the same under elogind as under logind is read from documentation and package contents, not seen on a running system. The first implementation must show each on both OSes.
 - **R8. Polkit coverage is a deny list.** An action not on the list that asks for an administrator would still show an admin prompt in the guest session (see point 1).
 
-## Questions only the owner can answer
+## Decisions (the owner, 2026-11-15)
 
-1. **Where reclogin's settings file lives** (`guest =` and automatic login): `/etc/reclogin.conf`, a system change that applies after the next boot on A/B (recommended), or `/var/lib/reclogin/`, which applies at once and is shared by both roots.
-2. **Guest default on or off** after installation. Recommended: on, and the installer asks nothing.
-3. **May a guest join a new WiFi network?** Recommended: no, existing connections only, because NetworkManager stores a new connection on disk where it outlives the guest. Allowing it needs NetworkManager's in-memory connections, which the desktop network applets do not create.
-4. **May a guest mount USB drives?** Recommended: yes (mount, unmount, eject only).
-5. **Home size cap:** a quarter of memory, at most 4 GiB (recommended), or another figure.
-6. **uid 60600**, or another number in 60578–61183.
-7. **Automatic login to the guest**: allowed for public machines (recommended), or forbidden.
+1. **reclogin's settings live in the system, in `/etc/reclogin.conf`** (`guest =` and automatic login). A change is a system change: on an A/B installation it goes into the other root and applies after the next start into it.
+2. **The Guest entry is on after installation.** The installer asks nothing.
+3. **A guest may not join a new WiFi network.** It uses the connections the computer already has.
+4. **A guest may use USB drives:** mount, unmount and eject only.
+5. **The home's size limit is a quarter of memory, at most 4 GiB.**
+6. **The account number is 60600.**
+7. **Automatic login may go to the guest**, for public or shared machines.
