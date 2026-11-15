@@ -4,13 +4,12 @@ sys.path.insert(0, ".")
 from pages_system import PAGES
 
 APPS = [
-    ("install screen", "The install screen", "What the live ISO opens. Today it is two boxed panes, each app with its own header and footer, and a third footer for the screen."),
-    ("install-hub", "Install steps", "The left pane of the install screen: the six steps in order."),
+    ("install screen", "The install screen", "What the live ISO opens. A root terminal on the left and the installation guide on the right."),
     ("disk-plan", "Disk", "Choosing, reviewing and writing the disk layout, on top of recpart."),
     ("base-system", "Base system", "Copying the system and writing its fstab, on top of recstrap and recfstab."),
     ("system-setup", "Configuration", "Keyboard, time zone, language, hostname, passwords and a user, on top of recsetup."),
     ("recab", "Updates", "The installed system's A/B slots, on top of recab."),
-    ("guide", "Guide", "The docs, beside the install steps or on their own."),
+    ("guide", "Guide", "The docs, beside the root terminal or on their own."),
 ]
 RULES = [
     ("One frame", "Every screen is the same five parts in the same places: the band, the step line, the rail, the content, the keys. Nothing is boxed; parts are told apart by their surface."),

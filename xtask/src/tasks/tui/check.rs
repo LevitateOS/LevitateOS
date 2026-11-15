@@ -2,7 +2,7 @@
 //!
 //! For every TUI package: typecheck, lint and format check. For every app: it must
 //! draw at a full console size without crashing (on every distro, for an app that is
-//! told its distro); the install screen's hub and docs must also draw, on every
+//! told its distro); the install screen's docs must also draw, on every
 //! distro, at the size their pane really has on each console (the docs at their
 //! page); snapshots under an app's `snapshots/[<distro>/]<columns>x<rows>/<page>.txt`
 //! must match, at sizes the app is really shown at; and each app's declared story
@@ -19,7 +19,7 @@ use super::{Launch, Tools};
 use crate::cli::{Distro, INSPECT_SIZE, INSPECT_WAIT};
 use crate::util::pty_capture::parse_keys;
 use distro_builder::tui_apps::{Story, TuiApp, Workspace};
-use distro_contract::install_ux::{DOCS, DOCS_PAGE, DOCS_PANE, HUB};
+use distro_contract::install_ux::{DOCS, DOCS_PAGE, DOCS_PANE};
 
 /// Console sizes the install screen runs on: a serial terminal, and the 1920x1080
 /// framebuffer the live kernel command line asks for (`video=1920x1080`) in 8x16 cells.
@@ -81,16 +81,10 @@ pub fn run(bless: bool) -> Result<()> {
         if !told {
             step(format!("render {name} {}x{}", FULL.columns, FULL.rows), render(&launch, &[], FULL));
         }
-        let pane = match name.as_str() {
-            HUB => Some(0),
-            DOCS => Some(1),
-            _ => None,
-        };
-        for (pane, distro) in pane.into_iter().flat_map(|pane| distros.iter().map(move |d| (pane, d))) {
+        let docs_pane = (name == DOCS).then_some(1);
+        for (pane, distro) in docs_pane.into_iter().flat_map(|pane| distros.iter().map(move |d| (pane, d))) {
             let mut args = launch.distro_args(distro);
-            if pane == 1 {
-                args.extend([DOCS_PANE.to_string(), app.page_arg()?.to_string(), DOCS_PAGE.to_string()]);
-            }
+            args.extend([DOCS_PANE.to_string(), app.page_arg()?.to_string(), DOCS_PAGE.to_string()]);
             for &(columns, rows) in CONSOLES {
                 let (pane_columns, pane_rows) = install_split_pane::pane_sizes(columns, rows)[pane];
                 let size = Size {

@@ -1,4 +1,4 @@
-"""The install: the hub, disk-plan and base-system.
+"""The install: disk-plan and base-system.
 
 Third pass: balance. Each page keeps the one picture of what it does, and loses whatever
 competed with it. A page has one thing to look at and at most one thing to press, and the
@@ -16,33 +16,6 @@ def page(app, name, note, p):
 STEP_KEYS = [("j/k", "step"), ("Enter", "go on"), ("q", "back")]
 CONFIRM_KEYS = [("y", "yes"), ("n", "no")]
 
-# ====================================================================== install hub
-HUB_STEPS = ["Preflight", "Disk", "Base system", "Configuration", "Boot", "Finish"]
-HUB_VALUES = ["UEFI", "nvme0n1", "copied", "ann", "A/B", ""]
-
-
-def hub(selected, done, cols=100, rows=28, distro="levitate", right="state in /run/install"):
-    p = Deliberate(cols, rows, distro)
-    p.band("Install", f"step {selected + 1} of 6")
-    p.steps(6, done, selected)
-    p.path([(label, "done" if i < done else "ready" if i == done else "todo", HUB_VALUES[i] if i < done else "")
-            for i, label in enumerate(HUB_STEPS)], selected)
-    p.keys([("j/k", "step"), ("Enter", "do it"), ("d", "mark done"), ("s", "shell"), ("q", "quit")], right)
-    return p
-
-
-def tile(p, x, w, tone, title, lines):
-    """A check as a tile: its verdict, and what was found."""
-    colour = TONES[tone]
-    top = p.y
-    p.card(x, top, w, 1 + len(lines), RAISED)
-    for r in range(top, top + 1 + len(lines)):
-        p.put(r, x, "█", colour)
-    p.put(top, x + 2, f"{'✗' if tone == 'danger' else '✓'} {title}", colour, RAISED, bold=True)
-    for i, (text, tone_) in enumerate(lines):
-        p.put(top + 1 + i, x + 2, text, tone_, RAISED)
-
-
 def from_to(p, source, target):
     """What goes where: two surfaces and an arrow."""
     half = (p.w - 5) // 2
@@ -56,66 +29,6 @@ def from_to(p, source, target):
     p.put(top + 2, p.x + half + 1, "──▶", p.accent, bold=True)
     p.y = top + len(source[1]) + 4
 
-
-def launch(p):
-    """What the hub shows for the step you are at: from what onto what, and the bar."""
-    p.heading(3, "Copy the system onto the disk", "A few minutes of copying, then the mounts are written down.")
-    from_to(p, ("The live image", ["/run/live-rootfs.erofs", "1.4 GiB"]), ("/mnt", ["/dev/nvme0n1p5, slot A", "30.0 GiB, empty"]))
-    p.button("Start base-system")
-
-
-def hub_pages():
-    p = page("install-hub", "1 Preflight", "Two tiles and a bar. The rail already shows the road ahead, so the page does not repeat it.", hub(0, 0))
-    p.heading(1, "Can this machine take the install?", "Two things must hold before anything is touched.")
-    half = (p.w - 2) // 2
-    tile(p, p.x, half, "success", "Booted in UEFI mode", [("systemd-boot needs it", MUTED)])
-    tile(p, p.x + half + 2, half, "success", "Install media mounted", [("/run/live-rootfs.erofs", MUTED)])
-    p.y += 3
-    p.text("Nothing on any disk changes before you type DESTROY in the Disk step.", MUTED)
-    p.button("Continue to the disk")
-
-    p = page("install-hub", "1 Preflight, a check failed", "The failed tile turns, and the line under the tiles says what to do. There is nothing to press.", hub(0, 0))
-    p.heading("bang", "This boot cannot take the install", "One of the two things does not hold.", BAD)
-    half = (p.w - 2) // 2
-    tile(p, p.x, half, "danger", "Not booted in UEFI mode", [("systemd-boot needs it", MUTED)])
-    tile(p, p.x + half + 2, half, "success", "Install media mounted", [("/run/live-rootfs.erofs", MUTED)])
-    p.y += 3
-    p.text("Reboot, open the firmware's boot menu, and pick the UEFI entry for the install media.")
-
-    p = page("install-hub", "3 A step ready to start", "The step you are at: what goes where, and one bar.", hub(2, 2))
-    launch(p)
-
-    p = page("install-hub", "2 A finished step", "A done step is the disk it left. Doing it again is one quiet line with its cost.", hub(1, 3))
-    p.heading(2, "The disk is laid out", "Done at 14:02.")
-    spans = p.diskbar([("", 4, SECONDARY), ("Windows", 300, MUTED), ("A", 30, p.accent), ("B", 30, OK), ("state", 112, HIGHLIGHT)], 476)
-    for (col, _), mount in zip(spans, ["/boot", "", "/mnt", "", "/var"]):
-        p.put(p.y, col, mount, MUTED)
-    p.note("Enter opens disk-plan again. That drops every step after it.")
-
-    p = page("install-hub", "5 A step that waits", "A step ahead shows what it waits for and what it will leave. Nothing to press yet.", hub(4, 2))
-    p.heading(5, "Install the boot loader", "systemd-boot, and one boot entry for each slot.")
-    p.card(p.x, p.y, p.w, 5)
-    p.put(p.y + 1, p.x + 2, "/boot", TEXT, SURFACE, bold=True)
-    for i, (entry, note, colour) in enumerate([("LevitateOS (slot A)", "the default", p.accent), ("LevitateOS (slot B)", "empty until the first update", MUTED)]):
-        p.put(p.y + 2 + i, p.x + 2, "▸", colour, SURFACE)
-        p.put(p.y + 2 + i, p.x + 4, entry, TEXT, SURFACE)
-        p.put(p.y + 2 + i, p.x + 28, note, MUTED, SURFACE)
-    p.note("Waits for the base system and the configuration.")
-
-    p = page("install-hub", "6 Finish", "The machine you made, one reminder, one bar.", hub(5, 5))
-    p.heading("check", "Ready to reboot", "The install is complete.", OK)
-    p.card(p.x, p.y, p.w, 7)
-    p.fill(p.y, p.x, p.w, p.accent)
-    p.put(p.y, p.x + 2, "studio", ON_FILL, p.accent, bold=True)
-    p.put(p.y, p.x + p.w - 16, "LevitateOS 1.0", ON_FILL, p.accent)
-    top = p.y + 2
-    p.y = top
-    p.facts([("Logs in", "ann, an administrator"), ("Keyboard", "de"), ("Clock", "Europe/Amsterdam")], x=p.x + 2, bg=SURFACE)
-    p.y = top
-    p.facts([("Disk", "nvme0n1, beside Windows"), ("Layout", "A/B, slot A"), ("Language", "en_US.UTF-8")], x=p.x + p.w // 2 + 3, bg=SURFACE)
-    p.y = top + 6
-    p.text("Remove the install media when the machine restarts.", WARN)
-    p.button("Unmount and reboot")
 
 
 # ====================================================================== disk-plan
@@ -386,6 +299,5 @@ def base_system_pages():
     p.button("Configure the system")
 
 
-hub_pages()
 disk_plan_pages()
 base_system_pages()

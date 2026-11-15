@@ -1690,7 +1690,6 @@ dependencies = [
  "sha2",
  "target-root",
  "tool-contract",
- "ts-rs",
 ]
 
 [[package]]

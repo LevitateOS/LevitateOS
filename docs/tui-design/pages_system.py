@@ -1,11 +1,11 @@
-"""system-setup, recab, the guide, and the install screen that holds the hub and the guide.
+"""system-setup, recab, the guide, and the install screen: a root terminal and the guide.
 
 Third pass: balance. Each page keeps the one picture of what it does, and loses whatever
 competed with it."""
 import pathlib
 import re
 from kit import *
-from pages_install import PAGES as _INSTALL, hub, launch, STEP_KEYS, CONFIRM_KEYS
+from pages_install import PAGES as _INSTALL, STEP_KEYS, CONFIRM_KEYS
 
 PAGES = []
 
@@ -427,12 +427,15 @@ def guide_pages():
 
 # ====================================================================== the install screen
 def install_screen(distro="levitate"):
-    """The hub and the guide side by side, as the live ISO opens: two panes of one
-    screen, one band, the pane without the keyboard quieter."""
+    """A root terminal and the guide side by side, as the live ISO opens: two panes of one
+    screen, the pane without the keyboard quieter."""
     cols, rows = 160, 30
     half = cols // 2
-    left = hub(2, 2, half, rows - 1, distro, right="")
-    launch(left)
+    left = Page(half, rows - 1, distro, rail=0)
+    for i, line in enumerate(["root@live:~# disk-plan", "(the helper app, or the commands by hand: never both)", "",
+                              "root@live:~# base-system", "", "root@live:~# recsetup apply --root /mnt --boot ab ...",
+                              "recsetup: step 1/3: install the boot loader ...", "", "root@live:~# "]):
+        left.put(1 + i, 2, line, TEXT if line.startswith("root@") else MUTED)
     right = guide(3, half, rows - 1, distro, brand=False, rail=28)
     right.heading(4, "Base System", "Installation steps 6-9.")
     numbered(right, 6, "Verify Installation Media")

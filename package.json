@@ -8,7 +8,6 @@
     "tools/tui/kit/install-state",
     "tools/tui/apps/install/base-system",
     "tools/tui/apps/install/disk-plan",
-    "tools/tui/apps/install/install-hub",
     "tools/tui/apps/install/system-setup",
     "tools/tui/apps/live-tools/install-docs"
   ],

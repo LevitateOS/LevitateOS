@@ -278,7 +278,7 @@ pub enum Cmd {
     /// app runs with its stand-in tools (its manifest's `inspect.path`), as headless runs do.
     /// `--story NAME` (or its number in `cargo xtask tui list <APP>`; implies `--stand-ins`)
     /// starts it with that story's arguments and environment, and you drive it. An app that
-    /// is told which distro it runs on (as the install screen tells the hub and the docs)
+    /// is told which distro it runs on (as the install screen tells the docs)
     /// needs `--distro ID` or a story. These go before the app's own arguments; after a
     /// `--`, everything goes to the app.
     ///

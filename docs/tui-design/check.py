@@ -1,7 +1,7 @@
 """Prints the mock-up pages as text and flags content that runs past its pane.
 
   python3 -B -I check.py all pages_system            every page
-  python3 -B -I check.py app:disk-plan pages_system  one app's pages (install screen, install-hub,
+  python3 -B -I check.py app:disk-plan pages_system  one app's pages (install screen,
                                                      disk-plan, base-system, system-setup, recab, guide)
   python3 -B -I check.py "2 Time zone" pages_system  pages whose name contains the text
   python3 -B -I check.py over pages_system           only pages whose content overflows"""
