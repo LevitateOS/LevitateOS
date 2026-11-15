@@ -1,6 +1,6 @@
 # reclogin: Technical Design
 
-Status: **design awaiting the owner's verdict. Nothing is built and nothing here was tried.** It turns the decisions in `docs/reclogin.md` and `docs/reclogin-guest.md` into parts, and names what the first implementation step has to show before the rest is worth writing. It authorizes no programming by itself.
+Status: **design awaiting the owner's verdict. Nothing is built. Its five assumptions were tried on both OSes on 2026-11-15 and held (section 10).** It turns the decisions in `docs/reclogin.md` and `docs/reclogin-guest.md` into parts, and names what the first implementation step has to show before the rest is worth writing. It authorizes no programming by itself.
 
 Facts it rests on, read in the source on 2026-11-15:
 
@@ -71,7 +71,7 @@ After PAM says yes, `reclogind` opens the PAM session. That is what registers th
 The session files in `/usr/share/wayland-sessions` and `/usr/share/xsessions` say what to run. reclogin hardcodes no desktop.
 
 - **Wayland session (Plasma):** run the session's command. The desktop's compositor takes the display from logind by itself.
-- **X session (LXQt on AcornOS):** reclogin starts the X server for that user on the session's console, waits until it says which display number it took, writes the access key for it, and then runs the session's command. When the session ends, reclogin stops the X server. This replaces what `startx` and SDDM did, in about one small module, with no extra program to ship.
+- **X session (LXQt on AcornOS):** reclogin hands the session's console device to the user, starts the X server for that user on it with the console as its input, waits until it says which display number it took, writes the access key for it, and then runs the session's command. When the session ends, reclogin stops the X server. This replaces what `startx` and SDDM did, in about one small module, with no extra program to ship.
 - **Session bus:** where logind does not provide one (OpenRC), the session is started under `dbus-run-session`.
 
 When the desktop exits, `reclogind` closes the PAM session, ends what is left of that login through logind, switches back to console 7 and starts a fresh greeter.
@@ -109,22 +109,41 @@ The two typefaces (Newsreader and Instrument Sans, both under the Open Font Lice
 - **Installer:** the automatic-login step writes `/etc/reclogin.conf` instead of the SDDM file.
 - **Live medium:** unchanged. It has no login screen.
 
-## 10. What the first step must show
+## 10. What the first try showed (2026-11-15)
 
-Everything above rests on things that were read, not seen. The first step is one small program, tried on both OSes in the existing VMs, that shows:
+A small throwaway program (`tools/reclogin/try`) was run as root in the owner's two installed VMs: LevitateOS (kernel 7.3.4, systemd-logind 262, Plasma on Wayland under SDDM) and AcornOS (kernel 6.18.63, elogind 255, LXQt on X under SDDM). Both have a virtio display at 1280×800. Screenshots were taken from the host and keys were sent from the host.
 
-1. A program with no rights can draw the login screen to the display it was handed, with no X server and no compositor, on LevitateOS and on AcornOS.
-2. It gets keyboard, pointer and touch through handles opened for it.
-3. The display can be given to a Plasma session on another console and taken back after logout.
-4. The same for an LXQt session with the X server started by us.
-5. logind and elogind answer the same way for sessions, power and switching.
+| What had to be shown | LevitateOS | AcornOS |
+|---|---|---|
+| 1. A program with no rights (uid 65534) draws the login picture straight to the display it was handed, with no X server and no compositor. Opening the display by itself was refused, as it must be. | yes | yes |
+| 2. It reads keys and the pointer through input devices opened for it. | yes (7 of 7 keys) | yes (7 of 7 keys) |
+| 3. A desktop started by us on another console takes the display, and the first console gets it back afterwards. | yes: a second Plasma compositor with a terminal, on console 1 | see 4 |
+| 4. The X server, started by us as the user without root rights, in a session we registered. | not applicable | yes: XLibre with a window manager and a terminal, on console 8 |
+| 5. The two login services answer alike. | power questions, the session list, session and seat properties, making a session, and bringing a session to the front all gave the same answers | same |
 
-That step is a run, so it needs the owner's word. If point 1 fails on either OS, the fallback is a small compositor under the greeter, which changes section 3 and adds a part to ship.
+The running desktop came back cleanly each time on both systems.
 
-Other risks:
+Drawing on the processor: the still picture took 28 ms (LevitateOS) and 107 ms (AcornOS) once; a full redraw took 9 to 12 ms on average and 21 to 51 ms at worst. That is at 1280×800 in a VM. It was not measured at larger sizes or on real hardware.
 
-- **Machines whose display has no kernel driver.** The greeter needs the kernel to offer a display device. Which firmware and VM displays the two kernels cover was not checked here (`distro/variants/*/kconfig` holds only the differences from the default configuration).
-- **The X server without root.** That XLibre's wrapper lets a logged-in user start it on their console under elogind is assumed from how it is built.
+What the try taught, to be built in:
+
+- **The system bus is at `/run/dbus/system_bus_socket`.** reclogin must use that path. On LevitateOS `/var/run` is a plain folder, not a link to `/run`, so the usual path does not exist there. That is a defect of the image in its own right.
+- **The console device has to be handed to the user before the X server starts.** Without that the X server stops with "Cannot open virtual console". A login program does this; `reclogind` must too, and take it back at logout.
+- **The X server's setuid wrapper only starts when its input is the console.**
+- **XLibre refuses the old `-noreset` option.**
+- **A session can only be made from outside every existing session.** `reclogind` is started by the init system, so this holds for it; it mattered for the try, which was started from a desktop terminal.
+- **Free consoles differ:** console 1 on LevitateOS today (its text login is switched off by the Plasma group), console 8 on AcornOS. Section 2's plan (login screen on 7, desktops on the next free one) does not depend on which one is free.
+
+What the try did not cover:
+
+- **PAM.** The sessions were registered with the login service directly, which is the call its PAM module makes. The password conversation and the PAM modules themselves were not run.
+- **A full Plasma or LXQt session.** A compositor with a terminal and a window manager with a terminal stood in for them.
+- **Real hardware**, graphics cards with their own drivers, several monitors, touchscreens and touchpads.
+- **The greeter's lock-down** (no network, read-only view), switching consoles by key while the greeter is shown, and the idle switch-off.
+
+Other risks, unchanged:
+
+- **Machines whose display has no kernel driver.** The greeter needs the kernel to offer a display device. Which firmware displays the two kernels cover was not checked.
 - **Screen readers** are not in the first version.
 - **A locked-down greeter needs kernel features** (Landlock, namespaces). Both kernels are expected to have them; not checked.
 
@@ -138,14 +157,13 @@ Other risks:
 
 ## 12. Order of work, once approved
 
-1. The first step of section 10, on both OSes.
-2. `reclogind`: consoles, devices, the socket, PAM, starting and ending a Wayland session.
-3. The greeter: the normal login, wrong password, PAM messages, the footer.
-4. X sessions.
-5. Logged-in users, power, last session, automatic login.
-6. The guest, as `docs/reclogin-guest.md` describes.
-7. The on-screen keyboard and several monitors.
-8. Crash handling and the two init services.
-9. The prebuilt, the `login-screen` group on both OSes, SDDM out, the installer's setting.
+1. `reclogind`: consoles, devices, the socket, PAM, starting and ending a Wayland session.
+2. The greeter: the normal login, wrong password, PAM messages, the footer.
+3. X sessions.
+4. Logged-in users, power, last session, automatic login.
+5. The guest, as `docs/reclogin-guest.md` describes.
+6. The on-screen keyboard and several monitors.
+7. Crash handling and the two init services.
+8. The prebuilt, the `login-screen` group on both OSes, SDDM out, the installer's setting.
 
-Steps 2 to 9 are written without building images. What they are worth is only known when the owner builds.
+These steps are written without building images. What they are worth is only known when the owner builds.
