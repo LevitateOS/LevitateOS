@@ -768,10 +768,13 @@ struct Plan {
     recipe: PathBuf,
 }
 
-/// The `distro` entry of `_asset` in linux-prebuilt.rhai: the text range of
-/// its sha256 string, plus its repo and current digest.
+/// The `distro` entry of the `ASSETS` constant in linux-prebuilt.rhai: its
+/// repo, and the text range of its sha256 string (the one place the published
+/// asset's digest lives).
 fn asset_entry(text: &str, distro: &str) -> Result<(String, std::ops::Range<usize>)> {
-    let from = text.find("fn _asset").context("linux-prebuilt.rhai has no _asset")?;
+    let from = text
+        .find("const ASSETS = #{")
+        .context("linux-prebuilt.rhai has no `const ASSETS = #{`")?;
     let start = text[from..]
         .find(&format!("{distro}: #{{"))
         .map(|i| i + from)
