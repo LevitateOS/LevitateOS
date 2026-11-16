@@ -407,7 +407,9 @@ fn no_prebuilt_arg() -> Arg {
     Arg::new("no_prebuilt")
         .long("no-prebuilt")
         .action(clap::ArgAction::SetTrue)
-        .help("Compile our own tools and the TUI binary instead of reusing or downloading prebuilts")
+        .help(
+            "Compile our own tools and the TUI binary instead of reusing or downloading prebuilts",
+        )
 }
 
 /// "The test-install-base ISO (input of the test-install-base and install scenarios)".
@@ -557,7 +559,7 @@ pub struct KernelArgs {
     #[command(flatten)]
     pub distros: DistroSelection,
     /// Download the distro's prebuilt kernel instead of compiling.
-    #[arg(long, conflicts_with = "autofix")]
+    #[arg(long)]
     pub prebuilt: bool,
     /// Build (or download) again even if verified artifacts are present.
     #[arg(long)]
@@ -565,18 +567,6 @@ pub struct KernelArgs {
     /// Compile even outside the 10:00-23:00 kernel build window.
     #[arg(long, conflicts_with = "prebuilt")]
     pub now: bool,
-    /// On failure, let recipe ask the configured LLM for a patch and retry.
-    #[arg(long)]
-    pub autofix: bool,
-    /// Autofix attempts per failing build.
-    #[arg(long, default_value_t = 2, requires = "autofix", value_parser = clap::value_parser!(u8).range(1..))]
-    pub autofix_attempts: u8,
-    /// Extra instructions appended to the autofix prompt.
-    #[arg(long, value_name = "PATH", requires = "autofix")]
-    pub autofix_prompt_file: Option<PathBuf>,
-    /// recipe LLM profile (from XDG `recipe/llm.toml`).
-    #[arg(long, requires = "autofix")]
-    pub llm_profile: Option<String>,
 }
 
 #[derive(Args)]

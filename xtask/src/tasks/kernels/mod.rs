@@ -2,7 +2,7 @@
 //! kernel module owns the kernel (its pin, the Recipe run, the bundle check).
 
 use anyhow::{Context, Result, bail};
-use distro_builder::kernel::{self, Autofix, KernelStatus, Source};
+use distro_builder::kernel::{self, KernelStatus, Source};
 
 mod publish;
 pub use publish::publish;
@@ -34,21 +34,22 @@ pub fn build(args: KernelArgs) -> Result<()> {
     let source = if args.prebuilt {
         Source::Prebuilt
     } else {
-        Source::Compile {
-            autofix: args.autofix.then(|| Autofix {
-                attempts: args.autofix_attempts,
-                prompt_file: args.autofix_prompt_file.clone(),
-                llm_profile: args.llm_profile.clone(),
-            }),
-        }
+        Source::Compile
     };
     for distro in args.distros.distros()? {
         let variant = distro_contract::load(&root, distro.id())?;
-        eprintln!("[info] {} kernel: {}", distro.id(), kernel::pin(&variant)?.release);
+        eprintln!(
+            "[info] {} kernel: {}",
+            distro.id(),
+            kernel::pin(&variant)?.release
+        );
         if !args.rebuild
             && let KernelStatus::Ready(release) = kernel::status(&variant)?
         {
-            eprintln!("[skip] {} kernel {release} is installed (--rebuild to install it again)", distro.id());
+            eprintln!(
+                "[skip] {} kernel {release} is installed (--rebuild to install it again)",
+                distro.id()
+            );
             continue;
         }
         if !args.prebuilt {
