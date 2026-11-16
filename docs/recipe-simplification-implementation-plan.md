@@ -1,3 +1,5 @@
+> **Superseded 2026-11-16** by [recipe-format.md](../tools/recipe/docs/recipe-format.md) (API 1). This note describes the old recipe format (`ctx`, `RUNTIME`, the hooks) as current; it is kept as history and is not the reference.
+
 # Recipe simplification implementation plan
 
 T01–T27 remain completed implementation history within their stated scope.

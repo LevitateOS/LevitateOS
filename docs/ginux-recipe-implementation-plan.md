@@ -1,3 +1,5 @@
+> **Superseded 2026-11-16** by [recipe-format.md](../tools/recipe/docs/recipe-format.md) (API 1). This note describes the old recipe format (`ctx`, `RUNTIME`, the hooks) as current; it is kept as history and is not the reference.
+
 # Ginux execution for Recipe: implementation and upstream contribution plan
 
 Current direction (2026-11-06): [the Recipe remaining-work queue](recipe-simplification-implementation-plan.md)
