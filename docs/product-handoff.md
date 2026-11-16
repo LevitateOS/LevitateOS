@@ -7,6 +7,7 @@ Read this before changing the installer, recab, Recipe, the Recipe/recab/recdirs
 ## 1. How to implement from this document
 
 - **Order of work:** §4 first (fetch upstream Ginux, fix Recipe, fix both OSes). Then the recab contract (§2.2/§2.3, which unblocks the Recipe defects in §5.1). Then the remaining §5 defects. §2's other rules apply to whatever you touch along the way.
+- **Never build on this document's say-so.** Nothing here authorizes a build: no ISO, rootfs, kernel, image, or other long build happens until **everything is ready and the user explicitly says to build**. Where this document says “fix”, “rebuild”, or “retest”, it means make the source ready — the actual build/boot verification waits for the user's explicit build go, every time. Installing into an existing environment (VM, checkout) is preferred over building a new one; see the user's standing rule: long builds only on explicit permission, never plan long rebuilds when an existing environment can be used.
 - Implement the settled model **exactly** and add nothing “helpfully” on top. Do not introduce extra lifecycle states, extra roles for a drive, candidate management, backup systems, recovery flows, agent integrations, or reinterpretations that change the design. If a proposed behavior cannot be stated in the simple terms of §2, it is not the intended design.
 - Do not defend the current implementation as the intended design, and do not re-explain its machinery as an answer to a design complaint. Where §5 quotes the current implementation's own words (sealed, trial, generation, adoption), that is evidence of the problem, never the vocabulary of the fix.
 
@@ -122,7 +123,7 @@ There is a whole agent application/subsystem — `tools/gui/agent` (`levitate-ag
 
 ## 4. DO FIRST: fetch upstream Ginux (upstream is leading), then fix Recipe and both OSes
 
-Before everything else — before the recab redesign, the Recipe work, and any ISO rebuild — reconcile `tools/ginux` with upstream. Upstream Ginux ([`gmkurtzer/ginux`](https://github.com/gmkurtzer/ginux), remote `upstream` in `tools/ginux`) has moved: as of 2026-11-15 upstream `main` is **67 commits ahead** of our fork's HEAD (`LevitateOS/ginux:main` in `tools/ginux`). Per the superproject rule, **upstream leads**: retain its history, reconcile the incoming upstream changes into our fork, and replace or drop our changes where upstream now provides the behavior; keep only the Recipe-required changes available in our repository.
+Before everything else — before the recab redesign, the Recipe work, and everything in §5 — reconcile `tools/ginux` with upstream. This section is about fetching and adapting **source only**: it never calls for building an OS, an ISO, or a kernel (see §1's never-build rule). Upstream Ginux ([`gmkurtzer/ginux`](https://github.com/gmkurtzer/ginux), remote `upstream` in `tools/ginux`) has moved: as of 2026-11-15 upstream `main` is **67 commits ahead** of our fork's HEAD (`LevitateOS/ginux:main` in `tools/ginux`). Per the superproject rule, **upstream leads**: retain its history, reconcile the incoming upstream changes into our fork, and replace or drop our changes where upstream now provides the behavior; keep only the Recipe-required changes available in our repository.
 
 Then fix what that reconciliation breaks downstream, in this order:
 
@@ -171,11 +172,11 @@ Do not treat the current Acorn release ISO as installable. This is a system bug,
 
 Verified: partitioning, system extraction, fstab generation, and basic setup complete; the user's Acorn disk has the correct GPT A/B layout but an empty EFI partition; the Acorn installed root provides OpenRC pieces and uses busybox as init but does **not** ship `/sbin/openrc-init`, which recab required for `REC_INIT=openrc` systems (`tools/recab/src/candidate.rs`).
 
-Status: recab's validation was changed to accept the init the Acorn image actually uses (`sbin/openrc`, plus tolerating Alpine's self-referential `kvm` group member) and that change is committed and pushed in the recab repo (`b9730d5`). It is **not** in any ISO: rebuild and retest the Acorn release ISO until the Boot step writes EFI boot files/entries and the installed system boots, so a fresh install no longer needs the hand-finishing recorded in §6. Do not merely suppress the check.
+Status: recab's validation was changed to accept the init the Acorn image actually uses (`sbin/openrc`, plus tolerating Alpine's self-referential `kvm` group member) and that change is committed and pushed in the recab repo (`b9730d5`). It is **not** in any ISO: when — and only when — the user gives the explicit build go (§1), the Acorn release ISO gets rebuilt and retested until the Boot step writes EFI boot files/entries and the installed system boots, so a fresh install no longer needs the hand-finishing recorded in §6. Do not merely suppress the check, and do not build early to “check” it.
 
 ### 5.3 LevitateOS: same no-bootable-disk outcome after the three apps
 
-The user ran the three helper apps (`disk-plan`, `base-system`, `system-setup`), ejected the ISO, and the firmware reported “No bootable option or device was found.” Verified from the Levitate VM disk on 2026-11-14: correct GPT A/B layout, again an empty EFI partition. The failure is at/after the non-app Boot and Finish command steps; do not treat the three apps as a completed installation (see also §2.1). The Levitate VM was hand-finished the same way as Acorn (§6); a fresh install from the current release ISO must be retested after the Boot-step fixes.
+The user ran the three helper apps (`disk-plan`, `base-system`, `system-setup`), ejected the ISO, and the firmware reported “No bootable option or device was found.” Verified from the Levitate VM disk on 2026-11-14: correct GPT A/B layout, again an empty EFI partition. The failure is at/after the non-app Boot and Finish command steps; do not treat the three apps as a completed installation (see also §2.1). The Levitate VM was hand-finished the same way as Acorn (§6); a fresh install from the current release ISO gets retested after the Boot-step fixes only on the user's explicit build go (§1).
 
 ### 5.4 Recipe cannot fetch: the LevitateOS CA trust bundle is missing
 
@@ -229,4 +230,4 @@ Both of the user's VMs were finished by hand on 2026-11-14 and boot from disk wi
 
 On 2026-11-14/15 the Levitate CA bundle was generated in both slots (`update-ca-trust extract`), and TLS was verified using only each VM's own bundle (118 certificates each): both `https://github.com` and the recipes index returned HTTP 200, and both VMs were left running at their login screens, ready for the user to test.
 
-That hand-finishing is evidence about the current ISOs, not a fix: the §5.2 recab change has since been committed and pushed (`b9730d5`), but no ISO carrying it has been built, so a fresh install from the current release ISOs will still hit the Boot-step failure until the ISO is rebuilt and retested.
+That hand-finishing is evidence about the current ISOs, not a fix: the §5.2 recab change has since been committed and pushed (`b9730d5`), but no ISO carrying it has been built, so a fresh install from the current release ISOs will still hit the Boot-step failure until — on the user's explicit build go — the ISO is rebuilt and retested.
