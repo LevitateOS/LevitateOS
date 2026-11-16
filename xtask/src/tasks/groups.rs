@@ -1,16 +1,18 @@
 //! `base groups`: share a variant's locked packages out among the group
 //! recipes of the public catalogue (`recipes/`), one owner per package, and
-//! write each group's pins into its recipe.
+//! write each group's pins file `NAME.pins` beside its recipe
+//! (docs/recipe-format.md, section 2.7), plus the generated `os-facts.rhai`
+//! module.
 //!
-//! A group recipe names its seeds per C library (`const SEEDS_GLIBC`, the
-//! LevitateOS build from Fedora RPMs; `const SEEDS_MUSL`, the AcornOS build
-//! from Alpine APKs) and the groups it needs (`let deps`). This resolves every
-//! group's seeds over the base and over the closures of the groups it
-//! declares, from the metadata of the packages the base and desktop locks
-//! already hold (each read from the lock command's own download cache and
-//! checked against the lock's SHA-256), so it works offline and only ever
-//! picks a locked build. A package one group's own closure needs belongs to
-//! that group; a package two or more groups' own closures need belongs to
+//! A group recipe names its seeds in `PACKAGES`, per C library (`glibc`, the
+//! LevitateOS build from Fedora RPMs; `musl`, the AcornOS build from Alpine
+//! APKs; `glibc_i686`, 32-bit seeds) and the groups it needs (`let deps`).
+//! This resolves every group's seeds over the base and over the closures of
+//! the groups it declares, from the metadata of the packages the base and
+//! desktop locks already hold (each read from the lock command's own download
+//! cache and checked against the lock's SHA-256), so it works offline and only
+//! ever picks a locked build. A package one group's own closure needs belongs
+//! to that group; a package two or more groups' own closures need belongs to
 //! `desktop-libs`, unless it needs one group's packages and every group that
 //! needs it depends on that group (then it goes with that group, so
 //! desktop-libs stands on the base alone). A package that only joins once
@@ -23,21 +25,24 @@
 //! `xlibre.rhai`, which holds only the server's run-time packages today) join
 //! in the later step that moves the desktop out of the builder.
 //!
-//! The pins go between `// BEGIN GENERATED PINS <libc>` and
-//! `// END GENERATED PINS <libc>`; the recipe's `version:` line and the
-//! `network_max_bytes:` line in its NEEDS follow from them. Nothing else in a
-//! recipe is touched. `--check` writes nothing and fails when a pin block is
-//! stale, when a group's closure holds another group's seed (or a
-//! `desktop-libs` package) without the group declaring that dependency, or
-//! when the base and the groups together differ from today's base and desktop
-//! locks in any package or version.
+//! Recipe text is never written. A run writes the section of its own C
+//! library into each group's pins file and keeps the other library's section
+//! as it is on disk (`cargo xtask base groups levitate` and `... acorn` each
+//! write their half); the `version` line follows from the later of the two
+//! lock dates. `os-facts.rhai` holds the facts of every variant. `--check`
+//! writes nothing and fails when a file differs from what a run would write,
+//! when a group's closure holds another group's seed (or a `desktop-libs`
+//! package) without the group declaring that dependency, or when the base and
+//! the groups together differ from today's base and desktop locks in any
+//! package or version.
 //!
-//! A glibc group may also name 32-bit seeds (`const SEEDS_I686`): no lock
-//! holds an i686 build (the locks are x86_64/noarch), so those come from
-//! Fedora's release and updates repositories; see [`add_i686`]. Only then does
-//! this read the network. The i686 packages are pinned with the group's share
-//! but stay out of the comparison with the locks, which still covers exactly
-//! the locked packages; they are listed on their own, and `--check` then also
+//! A glibc group may also name 32-bit seeds (`glibc_i686`): no lock holds an
+//! i686 build (the locks are x86_64/noarch), so those come from Fedora's
+//! release and updates repositories; see [`add_i686`]. Only then does this
+//! read the network. The i686 packages are pinned with the group's share
+//! (their pin lines carry a `.i686` name suffix and a `.i686.rpm` URL) but
+//! stay out of the comparison with the locks, which still covers exactly the
+//! locked packages; they are listed on their own, and `--check` then also
 //! follows the repositories (a newer i686 build there makes the pins stale).
 
 use anyhow::{Context, Result, bail};
@@ -73,11 +78,6 @@ fn libc_of(backend: PackageBackend) -> &'static str {
     }
 }
 
-/// The constants a block names, by C library.
-fn prefix_of(libc: &str) -> &'static str {
-    if libc == "glibc" { "RPM" } else { "APK" }
-}
-
 /// One row of a lock: name, name-version, URL, SHA-256.
 #[derive(Clone, Debug)]
 struct Row {
@@ -108,17 +108,16 @@ struct Locked {
 struct Group {
     name: String,
     path: PathBuf,
-    text: String,
     /// Seeds for the C library being generated.
     seeds: Vec<String>,
     /// Seeds per C library, for the libc check.
     seeds_by_libc: BTreeMap<&'static str, Vec<String>>,
     deps: Vec<String>,
     about_libc: Vec<String>,
-    /// `const SEEDS_I686`, as `NAME.i686`: 32-bit seeds, from Fedora's
+    /// `PACKAGES.glibc_i686`, as `NAME.i686`: 32-bit seeds, from Fedora's
     /// repositories (see [`add_i686`]). Empty when generating for musl.
     added: Vec<String>,
-    /// The `SEEDS_I686` list whatever is being generated, for the libc check.
+    /// The `glibc_i686` list whatever is being generated, for the libc check.
     added_glibc: Vec<String>,
 }
 
@@ -479,7 +478,7 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
         }
     }
 
-    // The i686 packages (SEEDS_I686): resolved after the locked share-out is
+    // The i686 packages (`glibc_i686`): resolved after the locked share-out is
     // final, so they never move a locked package, and kept out of the
     // comparison with the locks above.
     let added: BTreeMap<String, BTreeSet<String>> = if present.values().any(|g| !g.added.is_empty()) {
@@ -511,31 +510,46 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
         assigned.get_mut(g.as_str()).unwrap().extend(set.iter().cloned());
     }
 
-    // The OS facts a group's configuration needs (its name, website, desktop
-    // and palettes), from the variant contract: a public recipe cannot read
-    // the root it is installed into, so they are written in.
-    let os_facts = render_os_facts(distro, &bundle.contract);
-
-    // Write (or compare) each group recipe's block for this C library.
+    // The pins file of each group (this C library's section; the other one is
+    // kept as it is on disk), and the OS facts module.
     let release = &base_contract.release;
     let mut stale = Vec::new();
-    for g in &groups {
-        let set = assigned.get(g.name.as_str());
-        let extra = added.get(&g.name);
-        let block =
-            render_block(distro, backend, release, &pinned_on, &base_lock, &desktop_lock, set, extra, &locked);
-        let mut text = rewrite(&g.text, libc, &block)
-            .with_context(|| format!("rewriting {}", rel(&root, &g.path)))?;
-        text = replace_block(&text, &format!("GENERATED OS FACTS {libc}"), &os_facts)?;
-        if text != g.text {
-            if check {
-                stale.push(rel(&root, &g.path));
-            } else {
-                fs::write(&g.path, &text).with_context(|| format!("writing {}", g.path.display()))?;
-                println!("wrote {}", rel(&root, &g.path));
-            }
+    let mut emit = |path: &Path, text: String| -> Result<()> {
+        if fs::read_to_string(path).ok().as_deref() == Some(text.as_str()) {
+            return Ok(());
         }
+        if check {
+            stale.push(rel(&root, path));
+        } else {
+            fs::write(path, &text).with_context(|| format!("writing {}", path.display()))?;
+            println!("wrote {}", rel(&root, path));
+        }
+        Ok(())
+    };
+    for g in &groups {
+        if g.seeds_by_libc.values().all(Vec::is_empty) && g.added_glibc.is_empty() {
+            continue;
+        }
+        let path = g.path.with_extension("pins");
+        let existing = fs::read_to_string(&path).ok();
+        let mut has_build: BTreeMap<&str, bool> =
+            g.seeds_by_libc.iter().map(|(l, s)| (*l, !s.is_empty())).collect();
+        if !g.added_glibc.is_empty() {
+            has_build.insert("glibc", true);
+        }
+        let text = render_pins(
+            &g.name,
+            libc,
+            release,
+            &pinned_on,
+            assigned.get(g.name.as_str()),
+            &locked,
+            &has_build,
+            existing.as_deref(),
+        );
+        emit(&path, text)?;
     }
+    emit(&root.join("recipes/os-facts.rhai"), render_os_facts(&root)?)?;
 
     // Declared groups nothing in a group's closure comes from (said, not failed).
     let mut unneeded: Vec<String> = Vec::new();
@@ -782,7 +796,7 @@ fn release_of(release: &str) -> Result<String> {
     Ok(release.to_string())
 }
 
-/// A group's 32-bit packages (`const SEEDS_I686`), from Fedora's release and
+/// A group's 32-bit packages (`PACKAGES.glibc_i686`), from Fedora's release and
 /// updates repositories, since no lock holds an i686 build. They are resolved
 /// over the base, the group's own locked share, and the locked shares and
 /// i686 packages of every group it declares, from a universe of exactly
@@ -790,7 +804,7 @@ fn release_of(release: &str) -> Result<String> {
 /// package always satisfies what it can. What else they need must already be
 /// beneath the group: a locked package another group owns is named with that
 /// owner to declare; an x86_64/noarch package no lock holds is named to be
-/// seeded in SEEDS_GLIBC, so `base lock` locks it (and checks its signature)
+/// seeded in PACKAGES.glibc, so `base lock` locks it (and checks its signature)
 /// like every other 64-bit package. An i686 build whose x86_64 twin is locked
 /// is taken at the twin's very version (the two share their non-library
 /// files, which must be identical); when the repositories no longer have that
@@ -879,7 +893,7 @@ fn add_i686(
         for s in &g.added {
             if !pkgs.contains_key(s) {
                 problems.push(format!(
-                    "{name}: SEEDS_I686 names {}, which has no i686 build in Fedora {release}'s release and updates repositories",
+                    "{name}: PACKAGES.glibc_i686 names {}, which has no i686 build in Fedora {release}'s release and updates repositories",
                     s.trim_end_matches(".i686")
                 ));
                 bad = true;
@@ -905,7 +919,7 @@ fn add_i686(
                 ));
             } else if !p.ends_with(".i686") {
                 problems.push(format!(
-                    "{name}: its i686 packages need {p}, which no lock holds; name it in this group's SEEDS_GLIBC \
+                    "{name}: its i686 packages need {p}, which no lock holds; name it in this group's PACKAGES.glibc \
                      and run cargo xtask base lock levitate, then this again"
                 ));
             } else if let Some((other, _)) = sets.iter().find(|(_, s)| s.contains(p)) {
@@ -1191,7 +1205,7 @@ fn locked_on(path: &Path) -> Result<String> {
 }
 
 /// The quoted strings of the literal list that starts at `opener`
-/// (`const SEEDS_GLIBC = [` …), up to its closing `]`; comments skipped.
+/// (`let deps = [` …), up to its closing `]`; comments skipped.
 fn literal_list(text: &str, opener: &str) -> Option<Vec<String>> {
     let start = text.find(opener)? + opener.len();
     let mut out = Vec::new();
@@ -1224,31 +1238,24 @@ fn read_groups(dir: &Path, libc: &str) -> Result<Vec<Group>> {
     entries.sort();
     for path in entries {
         let text = fs::read_to_string(&path)?;
-        if !text.contains("// BEGIN GENERATED PINS glibc") {
-            continue;
-        }
+        let declared = base::declared_packages(&text).with_context(|| path.display().to_string())?;
+        // A plain-list PACKAGES is pinned by its own generator
+        // (recipes/generators/desktop-runtime-pins.py), not shared out here.
+        let Some(declared) = declared.filter(|d| d.by_libc) else { continue };
         let name = path.file_stem().unwrap().to_string_lossy().into_owned();
         let need = |opener: &str| {
             literal_list(&text, opener).with_context(|| format!("{}: no literal `{opener} … ]`", path.display()))
         };
-        let glibc = need("const SEEDS_GLIBC = [")?;
-        let musl = need("const SEEDS_MUSL = [")?;
-        let deps = need("let deps = [")?;
+        let deps = literal_list(&text, "let deps = [").unwrap_or_default();
         let about_libc = need("    libc: [")?;
-        // Optional: only a group that takes packages beyond the locks has it.
-        let added_glibc: Vec<String> = literal_list(&text, "const SEEDS_I686 = [")
-            .unwrap_or_default()
-            .into_iter()
-            .map(|s| format!("{s}.i686"))
-            .collect();
-        let seeds = if libc == "glibc" { glibc.clone() } else { musl.clone() };
+        let added_glibc: Vec<String> = declared.glibc_i686.iter().map(|s| format!("{s}.i686")).collect();
+        let seeds = if libc == "glibc" { declared.glibc.clone() } else { declared.musl.clone() };
         let added = if libc == "glibc" { added_glibc.clone() } else { Vec::new() };
         groups.push(Group {
             name,
             path,
-            text,
             seeds,
-            seeds_by_libc: BTreeMap::from([("glibc", glibc), ("musl", musl)]),
+            seeds_by_libc: BTreeMap::from([("glibc", declared.glibc), ("musl", declared.musl)]),
             deps,
             about_libc,
             added,
@@ -1256,7 +1263,7 @@ fn read_groups(dir: &Path, libc: &str) -> Result<Vec<Group>> {
         });
     }
     if groups.is_empty() {
-        bail!("{} holds no group recipe (none has a `// BEGIN GENERATED PINS glibc` block)", dir.display());
+        bail!("{} holds no group recipe (none declares PACKAGES as a map from C library to seeds)", dir.display());
     }
     Ok(groups)
 }
@@ -1295,144 +1302,132 @@ fn topo_order<'a>(present: &BTreeMap<&'a str, &'a Group>) -> Result<Vec<&'a str>
     Ok(order)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn render_block(
-    distro: &Distro,
-    backend: PackageBackend,
-    release: &str,
-    pinned_on: &str,
-    base_lock: &Path,
-    desktop_lock: &Path,
-    set: Option<&BTreeSet<String>>,
-    added: Option<&BTreeSet<String>>,
-    locked: &BTreeMap<String, Locked>,
-) -> String {
-    let libc = libc_of(backend);
-    let k = prefix_of(libc);
-    let id = distro.id();
-    let file = |p: &Path| p.file_name().unwrap_or_default().to_string_lossy().into_owned();
-    let mut text = format!("// BEGIN GENERATED PINS {libc}\n");
-    match set {
-        None => {
-            text.push_str(&format!(
-                "// No {libc} build: this recipe names no seeds in SEEDS_{}. Written by\n\
-                 // `cargo xtask base groups {id}`; do not edit.\n\
-                 const {k}_PINNED_ON = \"\";\n\
-                 const {k}_PINNED_BYTES = 0;\n\
-                 const {k}_PINS = [];\n",
-                libc.to_ascii_uppercase()
-            ));
-        }
-        Some(set) => {
-            let bytes: u64 = set.iter().map(|p| locked[p].bytes).sum();
-            let (what, from) = match backend {
-                PackageBackend::Rpm => (format!("Fedora {release} RPMs"), "lock"),
-                PackageBackend::Apk => (format!("Alpine {release} APKs"), "lock"),
-            };
-            text.push_str(&format!(
-                "// Written by `cargo xtask base groups {id}`; do not edit. This group's\n\
-                 // share of the {what} in {} and {} ({from}ed on\n\
-                 // {pinned_on}): {} packages, {bytes} bytes. Licences are each package's own.\n\
-                 const {k}_PINNED_ON = \"{pinned_on}\";\n\
-                 const {k}_PINNED_BYTES = {bytes};\n",
-                file(base_lock),
-                file(desktop_lock),
-                set.len(),
-            ));
-            if let Some(added) = added.filter(|a| !a.is_empty()) {
-                let i686 = added.iter().filter(|p| p.ends_with(".i686")).count();
-                text.push_str(&format!(
-                    "// {i686} of them are i686 builds (SEEDS_I686), which no lock holds: those Fedora\n\
-                     // {release}'s release and updates repositories held when this was written, each\n\
-                     // at the version of its locked x86_64 twin.\n"
-                ));
+/// What an existing pins file says about each C library: the fragment of its
+/// second line and the lines of its section.
+#[derive(Default)]
+struct Written {
+    fragments: BTreeMap<&'static str, String>,
+    sections: BTreeMap<&'static str, String>,
+}
+
+/// The section header of a C library in a pins file.
+fn section_header(libc: &str) -> &'static str {
+    if libc == "glibc" { "[glibc rpm]" } else { "[musl apk]" }
+}
+
+/// Reads what [`render_pins`] wrote earlier, as much as it needs: the
+/// per-library fragments of the second line and each section's lines.
+fn read_written(text: &str) -> Written {
+    let mut out = Written::default();
+    if let Some(line) = text.lines().nth(1).and_then(|l| l.strip_prefix("# ")) {
+        let marks = |libc: &str| [format!("{libc}: "), format!("No {libc} build")];
+        let find = |libc: &str| marks(libc).iter().filter_map(|m| line.find(m.as_str())).min();
+        let (g, m) = (find("glibc"), find("musl"));
+        for (libc, at, other) in [("glibc", g, m), ("musl", m, g)] {
+            if let Some(at) = at {
+                let end = other.filter(|o| *o > at).unwrap_or(line.len());
+                out.fragments.insert(libc, line[at..end].trim().to_string());
             }
-            text.push_str("// [name, file, URL, SHA-256, bytes, licence, var/ kept as state seeds]\n");
-            text.push_str(&format!("const {k}_PINS = [\n"));
-            for p in set {
-                let l = &locked[p];
-                text.push_str(&format!(
-                    "    [\"{}\", \"{}\", \"{}\", \"{}\", {}, \"{}\", {}],\n",
-                    p,
-                    l.row.file_name(),
-                    l.row.url,
-                    l.row.sha256,
-                    l.bytes,
-                    l.license.replace('\\', "\\\\").replace('"', "\\\""),
-                    l.seed
-                ));
-            }
-            text.push_str("];\n");
         }
     }
-    text.push_str(&format!("// END GENERATED PINS {libc}\n"));
+    for libc in ["glibc", "musl"] {
+        let header = section_header(libc);
+        let mut lines = text.lines().skip_while(|l| *l != header).skip(1).take_while(|l| !l.is_empty() && !l.starts_with('['));
+        if let Some(first) = lines.next() {
+            let mut body = format!("{first}\n");
+            for l in lines {
+                body.push_str(l);
+                body.push('\n');
+            }
+            out.sections.insert(libc, body);
+        }
+    }
+    out
+}
+
+/// The date a fragment says its lock was written on (`locked 2026-11-16`).
+fn fragment_date(fragment: &str) -> Option<&str> {
+    let at = fragment.find("locked ")? + "locked ".len();
+    fragment.get(at..at + 10)
+}
+
+/// The text of `NAME.pins` (docs/recipe-format.md, section 2.7): this C
+/// library's section made from `set`, the other library's kept from
+/// `existing` when the group has a build there.
+#[allow(clippy::too_many_arguments)]
+fn render_pins(
+    name: &str,
+    libc: &str,
+    release: &str,
+    pinned_on: &str,
+    set: Option<&BTreeSet<String>>,
+    locked: &BTreeMap<String, Locked>,
+    has_build: &BTreeMap<&str, bool>,
+    existing: Option<&str>,
+) -> String {
+    let written = existing.map(read_written).unwrap_or_default();
+    let set = set.filter(|s| !s.is_empty());
+    let mut fragments = Vec::new();
+    let mut sections = Vec::new();
+    for l in ["glibc", "musl"] {
+        let built = has_build.get(l).copied().unwrap_or(false);
+        let kept = written.fragments.get(l);
+        if l == libc && set.is_some() {
+            let what = if l == "glibc" { format!("Fedora {release}") } else { format!("Alpine {release}") };
+            fragments.push(format!("{l}: {what}, locked {pinned_on}."));
+            let mut body = String::new();
+            for p in set.into_iter().flatten() {
+                let k = &locked[p];
+                let licence = k.license.split_whitespace().collect::<Vec<_>>().join(" ");
+                body.push_str(&format!(
+                    "{p} {} {} {} {} {}\n",
+                    k.row.sha256,
+                    k.bytes,
+                    if k.seed { "var" } else { "-" },
+                    k.row.url,
+                    if licence.is_empty() { "-" } else { licence.as_str() },
+                ));
+            }
+            sections.push((l, body));
+        } else if l != libc && built {
+            match (kept.filter(|f| f.starts_with(&format!("{l}: "))), written.sections.get(l)) {
+                (Some(f), Some(body)) => {
+                    fragments.push(f.clone());
+                    sections.push((l, body.clone()));
+                }
+                _ => fragments.push(format!("{l}: not generated yet.")),
+            }
+        } else {
+            let none = format!("No {l} build");
+            fragments.push(kept.filter(|f| f.starts_with(&none)).cloned().unwrap_or(format!("{none}.")));
+        }
+    }
+    let version = fragments
+        .iter()
+        .filter_map(|f| fragment_date(f))
+        .max()
+        .unwrap_or(pinned_on)
+        .replace('-', ".");
+    let mut text = format!(
+        "# {name}.pins: written by `cargo xtask base groups`; do not edit.\n# {}\nversion {version}\n",
+        fragments.join(" ")
+    );
+    for (l, body) in sections {
+        text.push_str(&format!("\n{}\n{body}", section_header(l)));
+    }
     text
 }
 
-/// `text` with the `libc` block replaced by `block`, and the version and
-/// network_max_bytes lines made to follow both blocks.
-fn rewrite(text: &str, libc: &str, block: &str) -> Result<String> {
-    let begin = format!("// BEGIN GENERATED PINS {libc}\n");
-    let end = format!("// END GENERATED PINS {libc}\n");
-    let start = text.find(&begin).with_context(|| format!("no `{}` line", begin.trim_end()))?;
-    let stop = text[start..].find(&end).with_context(|| format!("no `{}` line", end.trim_end()))? + start + end.len();
-    let mut out = format!("{}{block}{}", &text[..start], &text[stop..]);
-
-    let string_const = |name: &str| -> String {
-        let opener = format!("const {name} = \"");
-        out.find(&opener)
-            .and_then(|i| out[i + opener.len()..].split('"').next())
-            .unwrap_or("")
-            .to_string()
-    };
-    let number_const = |name: &str| -> u64 {
-        let opener = format!("const {name} = ");
-        out.find(&opener)
-            .and_then(|i| out[i + opener.len()..].split(';').next())
-            .and_then(|n| n.trim().parse().ok())
-            .unwrap_or(0)
-    };
-    let dates = [string_const("RPM_PINNED_ON"), string_const("APK_PINNED_ON")];
-    let version = dates.iter().max().cloned().unwrap_or_default().replace('-', ".");
-    // A recipe that also downloads something besides its packages (steam:
-    // Valve's launcher) says how much in OTHER_DOWNLOAD_BYTES.
-    let bytes = number_const("RPM_PINNED_BYTES").max(number_const("APK_PINNED_BYTES"))
-        + number_const("OTHER_DOWNLOAD_BYTES");
-    // Room for the largest build, rounded up to whole MiB.
-    let limit = bytes.div_ceil(1 << 20).max(1) << 20;
-    if !version.is_empty() {
-        out = replace_line(&out, "    version: \"", &format!("    version: \"{version}\","))?;
-    }
-    out = replace_line(&out, "    network_max_bytes: ", &format!("    network_max_bytes: {limit},"))?;
-    Ok(out)
+/// A Rhai string literal's contents.
+fn quote(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
-/// `text` with the first line starting with `prefix` replaced by `line`.
-fn replace_line(text: &str, prefix: &str, line: &str) -> Result<String> {
-    let start = if text.starts_with(prefix) {
-        0
-    } else {
-        text.find(&format!("\n{prefix}")).with_context(|| format!("no line starting {prefix:?}"))? + 1
-    };
-    let stop = text[start..].find('\n').map_or(text.len(), |i| start + i);
-    Ok(format!("{}{line}{}", &text[..start], &text[stop..]))
-}
-
-/// `text` with the lines between `// BEGIN <marker>` and `// END <marker>`
-/// replaced by `block`'s inner lines, when the recipe has that block.
-fn replace_block(text: &str, marker: &str, block: &str) -> Result<String> {
-    let begin = format!("// BEGIN {marker}\n");
-    let end = format!("// END {marker}\n");
-    let Some(start) = text.find(&begin) else { return Ok(text.to_string()) };
-    let stop = text[start..].find(&end).with_context(|| format!("no `// END {marker}` line"))? + start;
-    Ok(format!("{}{begin}{block}{}", &text[..start], &text[stop..]))
-}
-
-/// The inner lines of a recipe's OS facts block for this variant: what its
-/// os-release and look files say, as the builder writes them into the base.
-fn render_os_facts(distro: &Distro, contract: &distro_contract::ConformanceContract) -> String {
-    let libc = libc_of(contract.profile.packages);
-    let k = prefix_of(libc);
+/// The text of `recipes/os-facts.rhai`: the facts of every variant (its
+/// identity, profile and look from distro.toml) behind `of(format)`, which a
+/// recipe calls as `os_facts::of(PACKAGE_FORMAT)`. A public recipe cannot read
+/// the root it is installed into, so the facts are written in.
+fn render_os_facts(root: &Path) -> Result<String> {
     let palette = |p: &distro_contract::Palette| {
         let roles = [
             ("surface", &p.surface), ("surface_raised", &p.surface_raised), ("surface_sunken", &p.surface_sunken),
@@ -1442,24 +1437,54 @@ fn render_os_facts(distro: &Distro, contract: &distro_contract::ConformanceContr
         ];
         let mut t = String::from("#{\n");
         for (role, hex) in roles {
-            t.push_str(&format!("        {role}: \"{hex}\",\n"));
+            t.push_str(&format!("            {role}: \"{}\",\n", quote(hex)));
         }
-        t.push_str("    }");
+        t.push_str("        }");
         t
     };
-    let identity = &contract.identity;
-    format!(
-        "// Written by `cargo xtask base groups {id}` from distro/variants/{id}/distro.toml\n\
-         // (identity, profile, look); do not edit.\n\
-         const {k}_OS = #{{\n    id: \"{os_id}\",\n    name: \"{name}\",\n    home_url: \"{home}\",\n    \
-         desktop: \"{desktop}\",\n    appearance: \"{appearance}\",\n    light: {light},\n    dark: {dark},\n}};\n",
-        id = distro.id(),
-        os_id = identity.os_id,
-        name = identity.os_name,
-        home = identity.home_url.as_deref().unwrap_or(""),
-        desktop = contract.profile.desktop.as_str(),
-        appearance = contract.profile.appearance.as_str(),
-        light = palette(&contract.look.light),
-        dark = palette(&contract.look.dark),
-    )
+    let mut ids = distro_contract::distro_ids(root);
+    ids.sort();
+    let mut text = String::from(
+        "// os-facts.rhai: written by `cargo xtask base groups`; do not edit.\n\
+         // What a recipe needs to know about the system it is installed into (its name,\n\
+         // website, desktop and palettes), from each variant's distro.toml (identity,\n\
+         // profile, look). `of(format)` takes PACKAGE_FORMAT: `rpm` or `apk`.\n\
+         \n\
+         fn of(format) {\n",
+    );
+    let mut formats = BTreeSet::new();
+    for id in &ids {
+        let bundle = distro_contract::load(root, id)?;
+        let c = &bundle.contract;
+        let format = match c.profile.packages {
+            PackageBackend::Rpm => "rpm",
+            PackageBackend::Apk => "apk",
+        };
+        if !formats.insert(format) {
+            bail!("two variants use the {format} package format; os-facts.rhai has one entry per format");
+        }
+        text.push_str(&format!(
+            "    // {name}: distro/variants/{id}/distro.toml\n\
+             \x20   if format == \"{format}\" {{\n\
+             \x20       return #{{\n\
+             \x20           id: \"{os_id}\",\n\
+             \x20           name: \"{name}\",\n\
+             \x20           home_url: \"{home}\",\n\
+             \x20           desktop: \"{desktop}\",\n\
+             \x20           appearance: \"{appearance}\",\n\
+             \x20           light: {light},\n\
+             \x20           dark: {dark},\n\
+             \x20       }};\n\
+             \x20   }}\n",
+            name = quote(&c.identity.os_name),
+            os_id = quote(&c.identity.os_id),
+            home = quote(c.identity.home_url.as_deref().unwrap_or("")),
+            desktop = c.profile.desktop.as_str(),
+            appearance = c.profile.appearance.as_str(),
+            light = palette(&c.look.light),
+            dark = palette(&c.look.dark),
+        ));
+    }
+    text.push_str("    throw \"os-facts.rhai: no facts for package format \" + format;\n}\n");
+    Ok(text)
 }

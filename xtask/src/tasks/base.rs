@@ -2,7 +2,7 @@
 //!
 //! The variant contract (`sources.rootfs_source.base`) names the release, its
 //! signing key and the base packages; the group recipes of the public
-//! catalogue (`recipes/*.rhai`, their `SEEDS_GLIBC`/`SEEDS_MUSL` lists, see
+//! catalogue (`recipes/*.rhai`, their `PACKAGES` seeds, see
 //! [`group_seeds`]) name what the software installed through Recipe adds. For
 //! an RPM variant this resolves each package and its closure
 //! (the requires and provides in Fedora's release and updates primary
@@ -89,15 +89,92 @@ impl Layer {
     }
 }
 
-/// Every seed the group recipes of the public catalogue (`recipes/*.rhai`)
-/// name for `backend`'s C library (`const SEEDS_GLIBC` for RPM, `const
-/// SEEDS_MUSL` for APK), each once, in file then list order: what the desktop
-/// lock resolves.
-pub fn group_seeds(root: &Path, backend: PackageBackend) -> Result<Vec<String>> {
-    let opener = match backend {
-        PackageBackend::Rpm => "const SEEDS_GLIBC = [",
-        PackageBackend::Apk => "const SEEDS_MUSL = [",
+/// The seeds a recipe's `PACKAGES` declaration names (docs/recipe-format.md,
+/// section 2.6). Read from the recipe's text as a literal, not by running it
+/// (the Recipe library's declaration reader insists on the pins file this
+/// generator is about to write).
+#[derive(Clone, Debug, Default)]
+pub struct PackageSeeds {
+    pub glibc: Vec<String>,
+    pub musl: Vec<String>,
+    /// 32-bit seeds, glibc only (`lib32`).
+    pub glibc_i686: Vec<String>,
+    /// The declaration is a map from C library to seeds. A plain list (the
+    /// same packages on every system, `desktop-runtime`) is pinned by its own
+    /// generator, so its names are not read here.
+    pub by_libc: bool,
+}
+
+/// The quoted strings of `text`.
+fn quoted(text: &str) -> Vec<String> {
+    text.split('"').skip(1).step_by(2).map(str::to_string).collect()
+}
+
+/// `PACKAGES` of a recipe, or `None` when it declares none.
+pub fn declared_packages(text: &str) -> Result<Option<PackageSeeds>> {
+    const OPENER: &str = "const PACKAGES = ";
+    let start = if text.starts_with(OPENER) {
+        0
+    } else if let Some(i) = text.find(&format!("\n{OPENER}")) {
+        i + 1
+    } else {
+        return Ok(None);
     };
+    let rest = &text[start + OPENER.len()..];
+    let (closer, by_libc) = if rest.starts_with("#{") {
+        ("};", true)
+    } else if rest.starts_with('[') {
+        ("];", false)
+    } else {
+        bail!("PACKAGES is a literal list of package names, or a map from C library to such lists");
+    };
+    // The declaration without its comments, up to its closing line.
+    let mut body = String::new();
+    let mut closed = false;
+    for line in rest.lines() {
+        let code = line.split("//").next().unwrap_or("");
+        body.push_str(code);
+        body.push('\n');
+        if code.contains(closer) {
+            closed = true;
+            break;
+        }
+    }
+    if !closed {
+        bail!("PACKAGES has no closing `{closer}`");
+    }
+    if !by_libc {
+        return Ok(Some(PackageSeeds::default()));
+    }
+    let field = |key: &str| -> Vec<String> {
+        let pattern = format!("{key}:");
+        let mut from = 0;
+        while let Some(i) = body[from..].find(&pattern).map(|i| i + from) {
+            let boundary = body[..i].chars().next_back().is_none_or(|c| !(c.is_alphanumeric() || c == '_'));
+            if boundary {
+                let after = &body[i + pattern.len()..];
+                if let (Some(open), Some(close)) = (after.find('['), after.find(']')) {
+                    return quoted(&after[open..close]);
+                }
+            }
+            from = i + pattern.len();
+        }
+        Vec::new()
+    };
+    Ok(Some(PackageSeeds {
+        glibc: field("glibc"),
+        musl: field("musl"),
+        glibc_i686: field("glibc_i686"),
+        by_libc,
+    }))
+}
+
+/// Every seed the group recipes of the public catalogue (`recipes/*.rhai`)
+/// name in `PACKAGES` for `backend`'s C library (`glibc` for RPM, `musl` for
+/// APK), each once, in file then list order: what the desktop lock resolves.
+/// A plain-list `PACKAGES` (`desktop-runtime`, pinned by its own generator)
+/// and the 32-bit seeds are not part of the locks.
+pub fn group_seeds(root: &Path, backend: PackageBackend) -> Result<Vec<String>> {
     let dir = root.join("recipes");
     let mut files: Vec<PathBuf> = fs::read_dir(&dir)
         .with_context(|| format!("reading {}", dir.display()))?
@@ -108,19 +185,21 @@ pub fn group_seeds(root: &Path, backend: PackageBackend) -> Result<Vec<String>> 
     let mut seeds: Vec<String> = Vec::new();
     for file in files {
         let text = fs::read_to_string(&file).with_context(|| format!("reading {}", file.display()))?;
-        let Some(start) = text.find(opener) else { continue };
-        let rest = &text[start + opener.len()..];
-        let end = rest
-            .find("];")
-            .with_context(|| format!("{}: {opener} has no closing `];`", file.display()))?;
-        for seed in rest[..end].split('"').skip(1).step_by(2) {
-            if !seeds.iter().any(|s| s == seed) {
-                seeds.push(seed.to_string());
+        let Some(declared) = declared_packages(&text).with_context(|| format!("{}", file.display()))? else {
+            continue;
+        };
+        let list = match backend {
+            PackageBackend::Rpm => declared.glibc,
+            PackageBackend::Apk => declared.musl,
+        };
+        for seed in list {
+            if !seeds.contains(&seed) {
+                seeds.push(seed);
             }
         }
     }
     if seeds.is_empty() {
-        bail!("no group recipe in {} names a seed in {opener}...]", dir.display());
+        bail!("no group recipe in {} names a seed in its PACKAGES for this C library", dir.display());
     }
     Ok(seeds)
 }
