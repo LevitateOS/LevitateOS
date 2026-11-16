@@ -213,7 +213,7 @@ requirements here, and each needs the one before:
 4. **It has the software.** Recipe adds menu entries, icons and file types
    (`XDG_DATA_DIRS`, caches); the first desktop recipes from decision 13
    (OnlyOffice, mail, media and graphics, chat, developer tools); the H.264
-   and AAC codec recipes on LevitateOS; an installable agent. AcornOS: the
+   and AAC codec recipe (`codecs`) on LevitateOS (written 2026-11-16, not run); an installable agent. AcornOS: the
    step that lets it run a program it did not link. The three maintenance
    apps (Recipe, System, Disk) run in an image against the real tools
    (`gui-ux-gaps.md`: 61 of 231 gaps done).
@@ -296,7 +296,7 @@ it only where it says so.
      recab and the image (B stage 3). This is the largest design gap and
      blocks every everyday setting, so it should start first;
    - microcode in recinit/recuki (B stage 2);
-   - Recipe menu, icon and file-type integration, the codec recipes, the
+   - Recipe menu, icon and file-type integration, the codec recipe (written 2026-11-16, not run), the
      first desktop recipes (B stage 4);
    - decide GPL source provision; write `SECURITY.md` (A5, A6).
 3. **First build of everything from current code:** both distros' base,

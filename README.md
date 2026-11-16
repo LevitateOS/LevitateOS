@@ -171,6 +171,7 @@ In source, unbuilt:
   `cargo xtask release keygen|sign|publish`. The base is an entry Recipe owns,
   and system groups change only with a release.
 - Steam for LevitateOS (`steam`, with the 32-bit libraries in `lib32`).
+- A `codecs` recipe for LevitateOS (the full FFmpeg codec library; written 2026-11-16, never run).
 - reclogin ([`tools/reclogin`](tools/reclogin)), the login screen for both
   OSes: a root program and a greeter with no rights that draws straight to
   the display, password login through PAM, Wayland and X sessions, the guest

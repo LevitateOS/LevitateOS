@@ -152,6 +152,7 @@ chat, graphics and developer tools.
 | Chat | `element` | upstream's build | | |
 | Code editor | `vscodium` | upstream's build | | |
 | Drawing | `krita` | upstream's build, later from source | | |
+| Codecs | `codecs` | RPM Fusion's `libavcodec-freeworld` (full FFmpeg) in /usr/lib64/ffmpeg, with the libraries it needs | LevitateOS only; open source, covered by patents in some countries | written 2026-11-16, never run |
 | Games | `steam` | upstream's launcher from Valve, with Fedora packages and the `lib32` group | LevitateOS only; proprietary | written 2026-11-15, never run |
 
 Steam (written 2026-11-15) is a system recipe, not a carried package: it
@@ -165,7 +166,8 @@ Steam recipe and no workaround: its musl base cannot run a glibc program
 (product handoff, section 2.5). The Steam client updates itself in the home
 folder and cannot be set to manual; Recipe updates the launcher, the rules and
 the libraries. With the image's Mesa drivers it is meant for AMD and Intel;
-NVIDIA's proprietary driver is a recipe still to write, and it must bring its
+NVIDIA's proprietary driver is a recipe still to write (left for now by the
+owner on 2026-11-16; see docs/desktop-todo.md decision 5), and it must bring its
 32-bit libraries. Whether Steam starts, logs in and runs Counter-Strike 2 is
 to be tried on real hardware.
 

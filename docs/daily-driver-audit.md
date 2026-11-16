@@ -123,7 +123,8 @@ would be met.
 - UEFI only, and Secure Boot must be switched off: the boot files are unsigned
   (no shim, no signing step; `recuki` "does not sign").
 - NVIDIA: nouveau only. The proprietary driver is a planned recipe, not
-  written.
+  written; the owner left it for now on 2026-11-16 (reasons in
+  docs/desktop-todo.md, decision 5).
 
 ### 4. An installed A/B system cannot keep everyday settings
 
@@ -224,7 +225,10 @@ Usable without them, but a person would notice within a week.
 
 - H.264 and HEVC: Fedora's `libavcodec-free` with the `noopenh264` stub and no
   `gstreamer1-plugins-good`. Expected: much web and local video will not play
-  until the codec recipe exists. AcornOS ships Alpine's full codecs and does
+  until the user installs the `codecs` recipe (written 2026-11-16, not run; not
+  in the image; it brings RPM Fusion's full FFmpeg library, with no hardware
+  decoding and no GStreamer plug-ins, and must be re-pinned when a release
+  changes FFmpeg). AcornOS ships Alpine's full codecs and does
   not have this problem.
 - Fedora's branding is still in the lock (`fedora-logos`,
   `plasma-lookandfeel-fedora`, `kde-settings*`, `f45-backgrounds-*`), and the
@@ -269,7 +273,7 @@ needs the image of the first.
    holes.
 4. **It has the software.** Recipe puts menus, icons and file types where the
    desktop looks; the first desktop recipes (PDF, pictures, media, office,
-   mail, chat); codecs on LevitateOS; an agent that can be installed. For
+   mail, chat); the `codecs` recipe for LevitateOS (written 2026-11-16, not run); an agent that can be installed. For
    AcornOS, the step that lets it run a program it did not link.
 5. **It stays safe for months.** A published, signed channel; a cadence that
    keeps Firefox current; update notices; encryption; Secure Boot signing.

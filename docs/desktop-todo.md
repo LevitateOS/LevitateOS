@@ -225,6 +225,8 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
 - [x] **A** Vulkan: `vulkan-loader` with Mesa's Intel and AMD drivers.
 - [x] **L A** NVIDIA's GPU firmware in both base locks, for nouveau.
 - [ ] **L A** NVIDIA's proprietary driver as a Recipe recipe (decision 5).
+  Not written; left for now by the owner on 2026-11-16 (what blocks it: under
+  decision 5).
 - [x] **A** `fwupd` is in the lock (L had it); firmware updates for laptops
   and docks.
 - [x] **L** Thunderbolt (`bolt`, `plasma-thunderbolt`).
@@ -281,7 +283,9 @@ Small on purpose; everything else comes through Recipe (section 6).
   as KCalc on L), `qps`, `unzip` and `7zip` added; PDF viewer and media
   player are Recipe's, as on L.
 - [x] **L A** Codecs: each image ships its distribution's (decision 4).
-- [ ] **L A** H.264, AAC and the rest as Recipe recipes.
+- [x] **L** H.264, AAC and the rest as a Recipe recipe: `codecs` (written
+  2026-11-16, never installed or run; no hardware decoding, no GStreamer
+  plug-ins). AcornOS needs none (Alpine's full codecs).
 - [x] **L** Fonts: Noto Serif, Noto Sans CJK and Liberation added.
 - [x] **A** Fonts: Liberation added (`font-noto` already has Serif).
 - [x] **A** CJK fonts: `font-noto-cjk`.
@@ -318,6 +322,8 @@ The desktop adds no other package manager, store or bundle format.
 - [ ] **L A** A graphical front-end for Recipe beside the command line
   (decision 7); plan it like the recab GUI.
 - [ ] **L A** Proprietary drivers and codecs as recipes (NVIDIA, H.264).
+  Codecs: `codecs` written 2026-11-16, not run. NVIDIA: not written, left for
+  now (decision 5).
 - [ ] **L A** State what Recipe lacks for each point above and extend Recipe.
 
 ## 7. Installing from the desktop ISO
@@ -454,6 +460,17 @@ is carried out.
    the rest come as Recipe recipes.
 5. **NVIDIA:** supported as a Recipe recipe (the proprietary module built per
    kernel); nouveau stays the default.
+   **What blocks it (2026-11-16)** (the owner left it for now):
+   - its kernel module must be compiled against LevitateOS's own kernel
+     (7.3.4), and kernel publishing ships no build tree (no headers,
+     `Module.symvers` or `scripts/`; only `.config`, `kernel.release`,
+     `vmlinuz` and the modules);
+   - a catalog recipe cannot read the target system's kernel tree, so the tree
+     would have to be a published, pinned download;
+   - a module installed by a recipe is outside the `base` entry, so a release
+     with a new kernel leaves it behind, and nothing rebuilds it per kernel;
+   - no boot-time module index is rebuilt after a system change (no `depmod`);
+   - public reports say NVIDIA's driver does not compile on kernel 7.3 yet.
 6. **Firewall:** firewalld on both desktops, incoming connections blocked
    except what a zone allows; Plasma's firewall settings page on LevitateOS.
    sshd is off on installed desktops (still on for the live ISO).
