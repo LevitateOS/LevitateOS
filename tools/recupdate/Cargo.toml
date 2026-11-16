@@ -15,7 +15,9 @@ path = "src/main.rs"
 anyhow = { workspace = true }
 base64 = "0.22"
 clap = { workspace = true }
-ed25519-dalek = "2"
+# Ed25519 verification of raw 32-byte keys: the ring ureq's TLS already links. ed25519-dalek
+# would vendor der/spki/pkcs8, whose PEM test fixtures the builder's key-material guard refuses.
+ring = "0.17"
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

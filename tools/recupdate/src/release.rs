@@ -2,7 +2,7 @@
 
 use anyhow::{bail, ensure, Context, Result};
 use base64::Engine;
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use ring::signature::{UnparsedPublicKey, ED25519};
 use serde::Deserialize;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -110,7 +110,10 @@ fn decode_b64(text: &[u8]) -> Result<Vec<u8>> {
         .context("not valid base64")
 }
 
-fn keys() -> Result<Vec<VerifyingKey>> {
+/// A release key: raw 32-byte Ed25519 public key.
+type ReleaseKey = UnparsedPublicKey<[u8; 32]>;
+
+fn keys() -> Result<Vec<ReleaseKey>> {
     let dir = crate::util::env_path("RECUPDATE_KEYS_DIR", DEFAULT_KEYS_DIR);
     let mut paths: Vec<PathBuf> = fs::read_dir(&dir)
         .with_context(|| format!("cannot read the key folder {}", dir.display()))?
@@ -125,9 +128,7 @@ fn keys() -> Result<Vec<VerifyingKey>> {
         let array: [u8; 32] = raw
             .try_into()
             .map_err(|_| anyhow::anyhow!("key {} is not 32 bytes", path.display()))?;
-        keys.push(
-            VerifyingKey::from_bytes(&array).with_context(|| format!("key {}", path.display()))?,
-        );
+        keys.push(UnparsedPublicKey::new(&ED25519, array));
     }
     ensure!(
         !keys.is_empty(),
@@ -164,7 +165,7 @@ pub fn load_channel() -> Result<Verified> {
 /// Check a manifest's signature over its exact bytes against the keys, then parse it and check
 /// its schema and OS. `what` and `sig_what` name the two files in messages.
 fn verify(
-    keys: &[VerifyingKey],
+    keys: &[ReleaseKey],
     os: &OsRelease,
     bytes: &[u8],
     sig_text: &[u8],
@@ -175,8 +176,7 @@ fn verify(
     let sig_array: [u8; 64] = sig
         .try_into()
         .map_err(|_| anyhow::anyhow!("signature {sig_what} is not 64 bytes"))?;
-    let signature = Signature::from_bytes(&sig_array);
-    if !keys.iter().any(|key| key.verify(bytes, &signature).is_ok()) {
+    if !keys.iter().any(|key| key.verify(bytes, &sig_array).is_ok()) {
         bail!("the signature of {what} matches none of the release keys; refusing it");
     }
     let manifest: Manifest = serde_json::from_slice(bytes)
