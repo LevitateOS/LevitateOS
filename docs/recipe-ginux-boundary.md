@@ -261,6 +261,107 @@ boundary correctly.
    openat2 confinement, such as refusing to follow symlinks anywhere under
    `/var/lib/recipe`.
 
+## 10. The overhead budget (the owner's rule, 2026-11-16)
+
+**The rule.** Where Recipe uses Ginux, the run may be at most 4% slower than
+the same run without Ginux. This is the number upstream Ginux holds itself
+to. Recipe holds its own use of Ginux to it as well.
+
+This section records the rule, what was known on the day it was stated, and
+what is still to decide. Nothing in it is built.
+
+### 10.1 What upstream's 4% covers
+
+Checked in the pinned fork (`f9bef00a`; upstream main `285d025b` of
+2026-11-13):
+
+- The 4% is Gate 11
+  (`tools/ginux/hdae/gates-todo/11-performance-characterization.md`). Each
+  mandatory row may be at most 4% behind native, and a slow row cannot be
+  averaged away by faster ones.
+- The rows measured are sysbench CPU, memory, thread-yield and mutex loops,
+  in instance modes, inside a QEMU Rocky host.
+- The gate is marked partial. CPU, memory and mutex pass; the thread-yield
+  rows are at 0.917x to 0.953x native (`hdae/STATUS.md`).
+- It is run by hand with `make bench-compare` on a benchmark host.
+  `.github/workflows/check.yml` runs no benchmark.
+
+It does not cover Recipe's use:
+
+- **Mode.** Recipe starts programs with `ginux launch` (backend
+  `ptrace-native`, paranoid syscall control). The gate measures instance
+  modes only.
+- **Kind of work.** The gate's loops make almost no system calls. A recipe
+  run is bound by them: path lookups, reads, file creation, starting
+  programs.
+- **Start-up.** No row measures unpacking the root image and starting a
+  launch.
+- **The launch-mode benchmark is ours.** `make bench-launch` (fork commit
+  `9aa8609e`, `tools/ginux/docs/launch-performance.md`) is not upstream. Its
+  text says the 4% budget does not apply to its rows. It has no accepted
+  baseline, and its budgets only compare Ginux with itself (10% to 20%).
+
+### 10.2 Where Recipe stood on 2026-11-16
+
+- One supervised call costs about 35 µs, against 0.9 µs natively. A stat of
+  a file in the image costs about 430 µs (`docs/build-redesign.md`).
+- A download-only install took 30 to 60 s in Ginux and 2 to 5 s on the host
+  (sections 2 and Status).
+- No whole build inside Ginux has been compared with the same build on the
+  host. The benchmark's `cc_hello` row would give a first number; no run of
+  it is recorded.
+- Recipes that run on the host (stage 2) do not use Ginux and pay nothing.
+- Upstream's own control run matters here: with Ginux detached and only one
+  constant-allow seccomp filter left, the thread-yield rows were still at
+  0.930x to 0.952x native (`hdae/STATUS.md`). So a single intercepted call
+  cannot be within 4% of native in any design that intercepts calls. The
+  rule can only hold for a whole run, in which intercepted calls are a small
+  part of the time.
+
+### 10.3 How to measure it (proposal, not decided)
+
+- **What is compared.** The wall time of one whole recipe run (download,
+  build, install), with start-up included: once as Recipe runs it, once
+  with the same programs started directly on the host.
+- **Per recipe, not on average.** As in Gate 11, each measured recipe must
+  be within the budget on its own.
+- **Same conditions.** Same machine, same inputs already downloaded, same
+  CPU count, an otherwise idle machine, alternating order, several
+  repetitions.
+- **The control run needs a tool.** `--execution host` refuses a recipe
+  that can start a program, by design. Measuring needs a way to run such a
+  recipe's programs unconfined, for the benchmark only.
+
+### 10.4 What meeting it would take
+
+None of this exists today.
+
+1. **The measurement of 10.3**, with a set of recipes that stands for the
+   real use: at least one small compile, one large compile (the kernel),
+   one package-manager run (`apk` or `dnf`) and one recipe that only checks
+   a downloaded program.
+2. **Stage 3 of section 6.** Only the foreign program runs inside Ginux;
+   Recipe's own file work runs on the host. This needs Ginux to assign a
+   host directory to an instance (section 5.2), which is upstream's
+   reserved filesystem area.
+3. **No root unpack per run.** Start-up is a fixed cost that a short run
+   cannot earn back within 4%.
+4. **A cheaper syscall control for launch.** Upstream has `selective` for
+   instance modes, where calls marked transparent and direct-safe go
+   straight to the host kernel. Launch uses `paranoid`.
+
+Even with all four, a build that touches many files may stay above 4%.
+Only the measurement can tell.
+
+### 10.5 Open decisions
+
+1. Whether 10.3 is the measure.
+2. Which recipes form the mandatory set.
+3. What happens to a recipe that is over the budget: reported only, or a
+   gate (a gate needs an override).
+4. Whether to offer the launch-mode benchmark and a launch-mode budget
+   upstream, so that Gate 11 covers this use.
+
 ## Status (2026-11-13)
 
 - **Stage 1, partly.** `target_extract_rpm` reads RPMs natively (Recipe
