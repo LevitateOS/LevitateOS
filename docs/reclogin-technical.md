@@ -1,6 +1,6 @@
 # reclogin: Technical Design
 
-Status: **approved by the owner on 2026-11-15. Since then it is written in `tools/reclogin` (`reclogind` and `reclogin-greeter`), never built into an image or run, and not switched in: SDDM is still the login screen on both OSes. What remains is in `tools/reclogin/dist/recipe/SWITCH.md`. Its five assumptions were tried on both OSes on 2026-11-15 and held (section 10).** It turns the decisions in `docs/reclogin.md` and `docs/reclogin-guest.md` into parts, and names what the first implementation step has to show before the rest is worth writing. It authorizes no programming by itself.
+Status: **approved by the owner on 2026-11-15. Since then it is written in `tools/reclogin` (`reclogind` and `reclogin-greeter`), never built into an image or run. Both prebuilts are published (`login-screen-86d815752d902d81`, LevitateOS; `login-screen-ffd914bc27cad91d`, AcornOS), and the switch from SDDM is written (2026-11-16): `recipes/login-screen.rhai` installs it on both OSes; nothing of it has been built into an image or run. Its five assumptions were tried on both OSes on 2026-11-15 and held (section 10).** It turns the decisions in `docs/reclogin.md` and `docs/reclogin-guest.md` into parts, and names what the first implementation step has to show before the rest is worth writing. It authorizes no programming by itself.
 
 Facts it rests on, read in the source on 2026-11-15:
 
@@ -108,6 +108,8 @@ The two typefaces (Newsreader and Instrument Sans, both under the Open Font Lice
 - **SDDM leaves both OSes:** out of `recipes/plasma.rhai` (packages, theme, unit link, the console mask) and out of `recipes/login-screen.rhai`. The locks and pins are regenerated.
 - **Installer:** the automatic-login step writes `/etc/reclogin.conf` instead of the SDDM file.
 - **Live medium:** unchanged. It has no login screen.
+
+Written on 2026-11-16, as above, with the two prebuilts named in the status line; not yet built into an image or run.
 
 ## 10. What the first try showed (2026-11-15)
 

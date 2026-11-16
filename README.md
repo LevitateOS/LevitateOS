@@ -104,7 +104,7 @@ and on the website.
 | [`tools/recstrap`](tools/recstrap), [`tools/recpart`](tools/recpart) | Install tools: extract the system and configure boot; plan and apply partitions. |
 | [`tools/recinit`](tools/recinit), [`tools/recuki`](tools/recuki), [`tools/reciso`](tools/reciso) | Build the initramfs, unified kernel images and the ISO. |
 | [`tools/recqemu`](tools/recqemu), [`tools/recguest`](tools/recguest), [`tools/recshuttle`](tools/recshuttle) | Scenario VMs under libvirt, the guest agent, and the SSH transport to a guest. |
-| [`tools/reclogin`](tools/reclogin) | The login screen (written, not in an image yet; see [`docs/reclogin.md`](docs/reclogin.md)). |
+| [`tools/reclogin`](tools/reclogin) | The login screen of both OSes, installed by the `login-screen` group recipe (written, not built into an image yet; see [`docs/reclogin.md`](docs/reclogin.md)). |
 | [`tools/gui`](tools/gui) | The Qt desktop apps: Recipe, Recab, Recdirstat (in `disk/`) and Updater. |
 | [`tools/recupdate`](tools/recupdate) | Checks for, downloads and (on a mutable installation) applies a release. |
 | [`tools/tui`](tools/tui) | The terminal apps of the live ISO and installer. |
@@ -179,7 +179,11 @@ In source, unbuilt:
   [`docs/reclogin.md`](docs/reclogin.md) and
   [`docs/reclogin-technical.md`](docs/reclogin-technical.md). Three
   independent reads of the code led to 47 fixes; none of it has
-  run on a console or display.
+  run on a console or display. Its prebuilts are published for both OSes
+  (`login-screen-86d815752d902d81`, LevitateOS;
+  `login-screen-ffd914bc27cad91d`, AcornOS), and the switch from SDDM is
+  written: the `login-screen` group recipe installs reclogin in both default
+  sets, and no group installs SDDM any more.
 - recab and the Recab app reach only an A/B installation, the Updater app
   only a mutable one.
 - Recipe pinned to a Ginux that includes upstream's work through gates 25 and
@@ -197,10 +201,8 @@ Not there yet:
   [`LevitateOS/releases`](https://github.com/LevitateOS/releases) exists and is
   empty.
 - A recipe for NVIDIA's proprietary driver.
-- reclogin as the login screen of an image. It is written (see above), but
-  SDDM stays the login screen until reclogin has been built and published for
-  each OS; the steps of the switch are in
-  `tools/reclogin/dist/recipe/SWITCH.md`.
+- reclogin as the login screen of a built image. The switch is written (see
+  above), but no image has been built with it and it has not run.
 
 The defects recorded in section 5 of the handoff (the install's Boot step on
 both OSes among them) were seen on ISOs built before this work. Whether it

@@ -1,6 +1,6 @@
 # reclogin: Implementation Plan
 
-Status: **plan, written 2026-11-15 on the owner's word. All stages are written in `tools/reclogin`, including the guest account; none was built into an image or run, and it is not switched in (SDDM is still the login screen). What remains is in `tools/reclogin/dist/recipe/SWITCH.md`.** It builds what these documents settle and changes none of it:
+Status: **plan, written 2026-11-15 on the owner's word. All stages are written in `tools/reclogin`, including the guest account; none was built into an image or run. Stage 10 is written too: both prebuilts are published (`login-screen-86d815752d902d81`, LevitateOS; `login-screen-ffd914bc27cad91d`, AcornOS), and the switch from SDDM is written (2026-11-16): `recipes/login-screen.rhai` installs it on both OSes; nothing of it has been built into an image or run.** It builds what these documents settle and changes none of it:
 
 - `docs/reclogin.md`: what reclogin is, the screens, the owner's decisions.
 - `docs/reclogin-guest.md`: the guest account.
@@ -51,7 +51,7 @@ Each stage ends in code that compiles and is committed. "Try" names what a run i
 | 7 | **The guest**, as `docs/reclogin-guest.md` says: the account, the PAM file, the memory home, the cleanup routine. | opus | 2 | A guest session; nothing left after logout or power loss. |
 | 8 | **On-screen keyboard, several monitors, idle switch-off.** | sonnet | 4 | Login by touch; a second monitor. |
 | 9 | **Failing safely.** Restarting the greeter, giving up after three crashes with the line on console 1, the systemd unit, the OpenRC service, the greeter's lock-down. | opus | 1 | A greeter that crashes on purpose. |
-| 10 | **Shipping.** The per-OS build and prebuilt, the `login-screen` group on both OSes, SDDM out, locks and pins regenerated, the default sets, the login scenario, the texts. | opus (builder), sonnet (recipes, texts) | 1 to 9 written | The owner's build. |
+| 10 | **Shipping.** The per-OS build and prebuilt, the `login-screen` group on both OSes, SDDM out, locks and pins regenerated, the default sets, the login scenario, the texts. | opus (builder), sonnet (recipes, texts) | 1 to 9 written | The owner's build. Written 2026-11-16 (both prebuilts published); not built into an image or run. |
 
 Stages 2, 4 and 9 start together once stage 1 is in, because stage 1 fixes the messages both programs use. Stage 10's builder part can also be written from stage 1 on.
 

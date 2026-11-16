@@ -203,7 +203,7 @@ packages = [
 # share of it as its pins.
 [desktop]
 recipes = [
-  "plasma", "konsole", "dolphin", "kwrite", "ark", "spectacle",
+  "plasma", "login-screen", "konsole", "dolphin", "kwrite", "ark", "spectacle",
   "plasma-systemmonitor", "kcalc", "skanlite", "drkonqi", "print-manager", "firefox",
   "audio", "network", "network-ui", "bluetooth", "printing", "firewall", "fonts",
   "fonts-office", "fonts-cjk", "spelling", "screen-reader", "thumbnailers",

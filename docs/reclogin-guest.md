@@ -1,6 +1,6 @@
 # reclogin: the Guest Account
 
-Status: **design; the owner answered its seven questions on 2026-11-15 (see "Decisions" at the end). The guest account is now written in `tools/reclogin` (`reclogind` and `reclogin-greeter`), never built into an image or run, and not switched in: SDDM is still the login screen on both OSes. What remains is in `tools/reclogin/dist/recipe/SWITCH.md`.** This document settles decision 10 of `docs/reclogin.md` ("Guest session: yes … how that account is made and removed is to be designed") on paper only.
+Status: **design; the owner answered its seven questions on 2026-11-15 (see "Decisions" at the end). The guest account is now written in `tools/reclogin` (`reclogind` and `reclogin-greeter`), never built into an image or run. Both prebuilts are published (`login-screen-86d815752d902d81`, LevitateOS; `login-screen-ffd914bc27cad91d`, AcornOS), and the switch from SDDM is written (2026-11-16): `recipes/login-screen.rhai` installs it on both OSes; nothing of it has been built into an image or run.** This document settles decision 10 of `docs/reclogin.md` ("Guest session: yes … how that account is made and removed is to be designed") on paper only.
 
 The login screen already shows the entry in its visual draft: **Guest**, with the line **"Nothing is kept after logout"**. This document says what has to be true for that line to be honest, on LevitateOS and on AcornOS, with one reclogin program.
 

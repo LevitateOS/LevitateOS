@@ -2,6 +2,8 @@
 
 > 2026-11-15: "the desktop is baked into the image" (package lists in `[desktop]`, merged into the rootfs by the builder) is superseded. The image holds only the minimal base; Plasma/LXQt, Firefox, audio, NetworkManager, Bluetooth, printing, the firewall and fonts are group recipes that `recsetup apply` installs from a package cache on the install medium, each with a Recipe receipt, removable or swappable in Recipe (removing the last desktop leaves a text login). The package lists and configuration below describe what those group recipes must contain. See docs/product-handoff.md §2.4 / docs/release-engineering.md. Unbuilt, not run.
 
+> 2026-11-16: the login screen of both OSes is reclogin (`tools/reclogin`), installed by the `login-screen` group recipe; SDDM is no longer installed by any group. What this document says about SDDM below is the 2026-11-07 state. Written, not built into an image or run.
+
 Each OS ships one release ISO, and it installs a desktop system. It boots
 into the install screen on tty1 (decided 2026-11-12: the live session is
 the installer, not a desktop); the desktop starts once installed.
