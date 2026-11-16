@@ -318,7 +318,9 @@ It does not cover Recipe's use:
   rule can only hold for a whole run, in which intercepted calls are a small
   part of the time.
 
-### 10.3 How to measure it (proposal, not decided)
+### 10.3 How to measure it (decided 2026-11-17)
+
+The owner decided on 2026-11-17 that this is the measure.
 
 - **What is compared.** The wall time of one whole recipe run (download,
   build, install), with start-up included: once as Recipe runs it, once
@@ -337,7 +339,8 @@ It does not cover Recipe's use:
 None of this exists today.
 
 1. **The measurement of 10.3**, with a set of recipes that stands for the
-   real use: at least one small compile, one large compile (the kernel),
+   real use. The owner decided on 2026-11-17 that the mandatory set is four
+   kinds of recipe: one small compile, one large compile (the kernel),
    one package-manager run (`apk` or `dnf`) and one recipe that only checks
    a downloaded program.
 2. **Stage 3 of section 6.** Only the foreign program runs inside Ginux;
@@ -353,14 +356,19 @@ None of this exists today.
 Even with all four, a build that touches many files may stay above 4%.
 Only the measurement can tell.
 
-### 10.5 Open decisions
+### 10.5 Decisions (2026-11-17)
 
-1. Whether 10.3 is the measure.
-2. Which recipes form the mandatory set.
-3. What happens to a recipe that is over the budget: reported only, or a
-   gate (a gate needs an override).
-4. Whether to offer the launch-mode benchmark and a launch-mode budget
-   upstream, so that Gate 11 covers this use.
+1. The measure is 10.3: the time of one whole recipe run (download, build,
+   install, start-up included) as Recipe runs it, compared with the same
+   programs started directly on the host, per recipe and not as an average.
+2. The mandatory set is four kinds of recipe: one small compile, one large
+   compile (the kernel), one package-manager run (`apk` or `dnf`) and one
+   recipe that only checks a downloaded program.
+3. A recipe over the budget is reported only. Nothing is blocked.
+4. Yes, offer upstream a benchmark and a budget for the way Recipe starts
+   Ginux (launch mode), so that its 4% gate covers this use. It is written
+   as a contribution in the usual procedure and posted only on the owner's
+   go.
 
 ## Status (2026-11-13)
 

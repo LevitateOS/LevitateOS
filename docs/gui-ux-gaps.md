@@ -2,6 +2,8 @@
 
 > 2026-11-15: pages that assume shipped software is burned into the image, or that no updater exists, are superseded: the desktop and other shipped software are Recipe groups the apps can remove or swap, and "Check for updates" exists in source in Recipe, Recab and Recdirstat, plus a fourth app, Updater, for mutable installations. See docs/product-handoff.md §2.4 / docs/release-engineering.md. Unbuilt, not run.
 
+> 2026-11-17: in the Recipe app, Install now starts the whole install at once; the "before" page is gone and there is no second press. Remove still asks, because it deletes things. Rows that describe the "before" page are not current.
+
 > **2026-11-15: the agent subsystem was removed** (`product-handoff.md`, section 3).
 > `levitate-agent`, Activity, Settings, the agent status in the window, the
 > prompt and hand-over pages, "Let the agent fix it", "Ask for software" and the
