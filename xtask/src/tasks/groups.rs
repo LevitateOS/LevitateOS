@@ -141,10 +141,18 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
         .max()
         .unwrap_or_default();
     let cache = match backend {
-        PackageBackend::Rpm => root.join(".artifacts/rpm-cache").join(format!("fedora-{}", base_contract.release)),
-        PackageBackend::Apk => root.join(".artifacts/apk-cache").join(&base_contract.release),
+        PackageBackend::Rpm => root
+            .join(".artifacts/rpm-cache")
+            .join(format!("fedora-{}", base_contract.release)),
+        PackageBackend::Apk => root
+            .join(".artifacts/apk-cache")
+            .join(&base_contract.release),
     };
-    eprintln!("[step] Check {} locked packages against {}", rows.len(), rel(&root, &cache));
+    eprintln!(
+        "[step] Check {} locked packages against {}",
+        rows.len(),
+        rel(&root, &cache)
+    );
     let files = cached_files(&cache, &rows)?;
     let (universe, meta, locked_rpms) = match backend {
         PackageBackend::Rpm => {
@@ -160,7 +168,15 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
         .iter()
         .map(|row| {
             let (bytes, license, seed) = meta[&row.name].clone();
-            (row.name.clone(), Locked { row: row.clone(), bytes, license, seed })
+            (
+                row.name.clone(),
+                Locked {
+                    row: row.clone(),
+                    bytes,
+                    license,
+                    seed,
+                },
+            )
         })
         .collect();
 
@@ -180,7 +196,9 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
         let mut want: Vec<&str> = g
             .seeds_by_libc
             .iter()
-            .filter(|(l, s)| !s.is_empty() || g.name == SHARED || (**l == "glibc" && !g.added_glibc.is_empty()))
+            .filter(|(l, s)| {
+                !s.is_empty() || g.name == SHARED || (**l == "glibc" && !g.added_glibc.is_empty())
+            })
             .map(|(l, _)| *l)
             .collect();
         want.sort();
@@ -220,7 +238,10 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
         }
     }
     if !problems.is_empty() {
-        bail!("the group recipes do not fit today's locks:\n  {}", problems.join("\n  "));
+        bail!(
+            "the group recipes do not fit today's locks:\n  {}",
+            problems.join("\n  ")
+        );
     }
 
     // The base: the variant's list without what a group names, plus base_adds.
@@ -230,12 +251,18 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
         .filter(|p| !seed_owner.contains_key(p.as_str()))
         .cloned()
         .collect();
-    let moved: Vec<&String> = base_contract.packages.iter().filter(|p| seed_owner.contains_key(p.as_str())).collect();
+    let moved: Vec<&String> = base_contract
+        .packages
+        .iter()
+        .filter(|p| seed_owner.contains_key(p.as_str()))
+        .collect();
     base_seeds.extend(base_adds(distro, backend).iter().map(|s| s.to_string()));
     let base_set = universe.resolve(&base_seeds, &BTreeSet::new())?;
     for (seed, owner) in &seed_owner {
         if base_set.contains(*seed) {
-            problems.push(format!("{owner}: seed {seed} is pulled into the base by the base's own packages"));
+            problems.push(format!(
+                "{owner}: seed {seed} is pulled into the base by the base's own packages"
+            ));
         }
     }
 
@@ -271,7 +298,8 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
             needed_by.entry(p.as_str()).or_default().push(g);
         }
     }
-    let mut assigned: BTreeMap<&str, BTreeSet<String>> = present.keys().map(|n| (*n, BTreeSet::new())).collect();
+    let mut assigned: BTreeMap<&str, BTreeSet<String>> =
+        present.keys().map(|n| (*n, BTreeSet::new())).collect();
     for (p, gs) in &needed_by {
         let owner = if gs.len() == 1 { gs[0] } else { SHARED };
         assigned.get_mut(owner).unwrap().insert(p.to_string());
@@ -325,13 +353,20 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
             let owners: BTreeSet<&str> = needs
                 .iter()
                 .filter(|n| *n != p && !beneath.contains(*n))
-                .filter_map(|n| assigned.iter().find(|(_, s)| s.contains(n)).map(|(g, _)| *g))
+                .filter_map(|n| {
+                    assigned
+                        .iter()
+                        .find(|(_, s)| s.contains(n))
+                        .map(|(g, _)| *g)
+                })
                 .collect();
             let owner = match owners.iter().next() {
                 None => SHARED,
                 Some(o)
                     if owners.len() == 1
-                        && gs.iter().all(|g| g == o || transitive_deps(&present, g).contains(o)) =>
+                        && gs
+                            .iter()
+                            .all(|g| g == o || transitive_deps(&present, g).contains(o)) =>
                 {
                     *o
                 }
@@ -363,7 +398,10 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
         let shared_now: Vec<String> = assigned[SHARED].iter().cloned().collect();
         let mut beneath_all = base_set.clone();
         beneath_all.extend(shared_now.iter().cloned());
-        if universe.resolve(&shared_now, &base_set)?.is_subset(&beneath_all) {
+        if universe
+            .resolve(&shared_now, &base_set)?
+            .is_subset(&beneath_all)
+        {
             break;
         }
         let mut moves: Vec<(String, &str)> = Vec::new();
@@ -374,14 +412,26 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
             let owners: BTreeSet<&str> = needs
                 .iter()
                 .filter(|n| *n != p && !beneath.contains(*n))
-                .filter_map(|n| assigned.iter().find(|(_, s)| s.contains(n)).map(|(g, _)| *g))
+                .filter_map(|n| {
+                    assigned
+                        .iter()
+                        .find(|(_, s)| s.contains(n))
+                        .map(|(g, _)| *g)
+                })
                 .collect();
             if owners.len() != 1 {
                 continue;
             }
             let o = *owners.iter().next().unwrap();
-            let needers: Vec<&str> = own.iter().filter(|(_, s)| s.contains(p)).map(|(g, _)| *g).collect();
-            if needers.iter().all(|g| *g == o || transitive_deps(&present, g).contains(o)) {
+            let needers: Vec<&str> = own
+                .iter()
+                .filter(|(_, s)| s.contains(p))
+                .map(|(g, _)| *g)
+                .collect();
+            if needers
+                .iter()
+                .all(|g| *g == o || transitive_deps(&present, g).contains(o))
+            {
                 moves.push((p.clone(), o));
             }
         }
@@ -408,30 +458,51 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
                 && owner != g
                 && !declared.contains(owner)
             {
-                problems.push(format!("{g}: needs {p}, a seed of {owner}, without declaring {owner} in deps"));
+                problems.push(format!(
+                    "{g}: needs {p}, a seed of {owner}, without declaring {owner} in deps"
+                ));
             }
         }
         if !declared.contains(&SHARED) && set.iter().any(|p| assigned[SHARED].contains(p)) {
-            let shared: Vec<&String> = set.iter().filter(|p| assigned[SHARED].contains(*p)).take(5).collect();
+            let shared: Vec<&String> = set
+                .iter()
+                .filter(|p| assigned[SHARED].contains(*p))
+                .take(5)
+                .collect();
             problems.push(format!(
                 "{g}: needs packages of {SHARED} ({}) without declaring {SHARED} in deps",
-                shared.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+                shared
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ));
         }
     }
     // desktop-libs itself stands on the base alone.
     let shared_seeds: Vec<String> = assigned[SHARED].iter().cloned().collect();
     let shared_closure = universe.resolve(&shared_seeds, &base_set)?;
-    let outside: Vec<&String> =
-        shared_closure.iter().filter(|p| !base_set.contains(*p) && !assigned[SHARED].contains(*p)).collect();
+    let outside: Vec<&String> = shared_closure
+        .iter()
+        .filter(|p| !base_set.contains(*p) && !assigned[SHARED].contains(*p))
+        .collect();
     if !outside.is_empty() {
         let owners: BTreeSet<&str> = outside
             .iter()
-            .filter_map(|p| assigned.iter().find(|(_, s)| s.contains(*p)).map(|(g, _)| *g))
+            .filter_map(|p| {
+                assigned
+                    .iter()
+                    .find(|(_, s)| s.contains(*p))
+                    .map(|(g, _)| *g)
+            })
             .collect();
         problems.push(format!(
             "{SHARED}: its packages need {} outside the base, owned by {owners:?}",
-            outside.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+            outside
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
     }
 
@@ -452,13 +523,20 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
     listed.extend(base::group_seeds(&root, backend)?);
     let needed = universe.resolve(&listed, &BTreeSet::new())?;
     let orphans: Vec<&Row> = rows.iter().filter(|r| !needed.contains(&r.name)).collect();
-    let today: BTreeMap<String, String> =
-        rows.iter().filter(|r| needed.contains(&r.name)).map(|r| (r.name.clone(), r.nv.clone())).collect();
+    let today: BTreeMap<String, String> = rows
+        .iter()
+        .filter(|r| needed.contains(&r.name))
+        .map(|r| (r.name.clone(), r.nv.clone()))
+        .collect();
     let mut differences = Vec::new();
     for (name, nv) in &today {
         match union.get(name) {
-            None => differences.push(format!("{nv}: in today's locks, in no group and not in the base")),
-            Some(v) if v != nv => differences.push(format!("{name}: today's lock has {nv}, the groups {v}")),
+            None => differences.push(format!(
+                "{nv}: in today's locks, in no group and not in the base"
+            )),
+            Some(v) if v != nv => {
+                differences.push(format!("{name}: today's lock has {nv}, the groups {v}"))
+            }
             Some(_) => {}
         }
     }
@@ -481,7 +559,8 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
     // The i686 packages (`glibc_i686`): resolved after the locked share-out is
     // final, so they never move a locked package, and kept out of the
     // comparison with the locks above.
-    let added: BTreeMap<String, BTreeSet<String>> = if present.values().any(|g| !g.added.is_empty()) {
+    let added: BTreeMap<String, BTreeSet<String>> = if present.values().any(|g| !g.added.is_empty())
+    {
         let found = add_i686(
             &release_of(&base_contract.release)?,
             &present,
@@ -507,7 +586,10 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
                 problems.push(format!("{g}: {p} is licensed {:?}", locked[p].license));
             }
         }
-        assigned.get_mut(g.as_str()).unwrap().extend(set.iter().cloned());
+        assigned
+            .get_mut(g.as_str())
+            .unwrap()
+            .extend(set.iter().cloned());
     }
 
     // The pins file of each group (this C library's section; the other one is
@@ -527,13 +609,18 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
         Ok(())
     };
     for g in &groups {
-        if g.seeds_by_libc.values().all(Vec::is_empty) && g.added_glibc.is_empty() {
+        // The shared group has no seeds of its own: the share-out fills it.
+        let shared = g.name == SHARED;
+        if !shared && g.seeds_by_libc.values().all(Vec::is_empty) && g.added_glibc.is_empty() {
             continue;
         }
         let path = g.path.with_extension("pins");
         let existing = fs::read_to_string(&path).ok();
-        let mut has_build: BTreeMap<&str, bool> =
-            g.seeds_by_libc.iter().map(|(l, s)| (*l, !s.is_empty())).collect();
+        let mut has_build: BTreeMap<&str, bool> = g
+            .seeds_by_libc
+            .iter()
+            .map(|(l, s)| (*l, shared || !s.is_empty()))
+            .collect();
         if !g.added_glibc.is_empty() {
             has_build.insert("glibc", true);
         }
@@ -562,10 +649,18 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
         let used: BTreeSet<&str> = closure
             .iter()
             .filter(|p| !base_set.contains(*p))
-            .filter_map(|p| assigned.iter().find(|(_, s)| s.contains(p)).map(|(o, _)| *o))
+            .filter_map(|p| {
+                assigned
+                    .iter()
+                    .find(|(_, s)| s.contains(p))
+                    .map(|(o, _)| *o)
+            })
             .filter(|o| o != name)
             .collect();
-        let reach: BTreeSet<&str> = used.iter().flat_map(|u| transitive_deps(&present, u)).collect();
+        let reach: BTreeSet<&str> = used
+            .iter()
+            .flat_map(|u| transitive_deps(&present, u))
+            .collect();
         for d in &g.deps {
             if !used.contains(d.as_str()) && !reach.contains(d.as_str()) {
                 unneeded.push(format!("{name} -> {d}"));
@@ -575,15 +670,33 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
 
     // The partition, for the person running it.
     println!();
-    println!("{} ({libc}) from {} and {}:", distro.id(), rel(&root, &base_lock), rel(&root, &desktop_lock));
-    let mib = |set: &BTreeSet<String>| set.iter().map(|p| locked[p].bytes).sum::<u64>() as f64 / 1048576.0;
+    println!(
+        "{} ({libc}) from {} and {}:",
+        distro.id(),
+        rel(&root, &base_lock),
+        rel(&root, &desktop_lock)
+    );
+    let mib = |set: &BTreeSet<String>| {
+        set.iter().map(|p| locked[p].bytes).sum::<u64>() as f64 / 1048576.0
+    };
     println!("  {:<22} {:>5} {:>9}  deps", "group", "pkgs", "MiB");
-    println!("  {:<22} {:>5} {:>9.1}  (stays in the image)", "base", base_set.len(), mib(&base_set));
+    println!(
+        "  {:<22} {:>5} {:>9.1}  (stays in the image)",
+        "base",
+        base_set.len(),
+        mib(&base_set)
+    );
     let mut total = base_set.len();
     for name in &order {
         let set = &assigned[name];
         total += set.len();
-        println!("  {:<22} {:>5} {:>9.1}  {}", name, set.len(), mib(set), present[name].deps.join(" "));
+        println!(
+            "  {:<22} {:>5} {:>9.1}  {}",
+            name,
+            set.len(),
+            mib(set),
+            present[name].deps.join(" ")
+        );
     }
     total -= added_count;
     if added_count > 0 {
@@ -601,19 +714,33 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
             );
         }
     }
-    let lacking: Vec<&str> = groups.iter().filter(|g| !present.contains_key(g.name.as_str())).map(|g| g.name.as_str()).collect();
+    let lacking: Vec<&str> = groups
+        .iter()
+        .filter(|g| !present.contains_key(g.name.as_str()))
+        .map(|g| g.name.as_str())
+        .collect();
     if !lacking.is_empty() {
         println!("  no {libc} build: {}", lacking.join(" "));
     }
     if !moved.is_empty() {
         println!(
             "  moved out of the base list into groups: {}",
-            moved.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(" ")
+            moved
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join(" ")
         );
     }
-    println!("  added to the base: {}", base_adds(distro, backend).join(" "));
+    println!(
+        "  added to the base: {}",
+        base_adds(distro, backend).join(" ")
+    );
     if !unneeded.is_empty() {
-        println!("  declared, nothing on {libc} comes from it (install_if joins aside): {}", unneeded.join(", "));
+        println!(
+            "  declared, nothing on {libc} comes from it (install_if joins aside): {}",
+            unneeded.join(", ")
+        );
     }
     if !orphans.is_empty() {
         println!(
@@ -621,7 +748,11 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
              (cargo xtask base lock {} drops them): {}",
             orphans.len(),
             distro.id(),
-            orphans.iter().map(|r| r.nv.as_str()).collect::<Vec<_>>().join(" ")
+            orphans
+                .iter()
+                .map(|r| r.nv.as_str())
+                .collect::<Vec<_>>()
+                .join(" ")
         );
     }
     println!(
@@ -630,7 +761,10 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
         rows.len(),
         orphans.len()
     );
-    println!("  union equals today's lock: {}", if differences.is_empty() { "yes" } else { "no" });
+    println!(
+        "  union equals today's lock: {}",
+        if differences.is_empty() { "yes" } else { "no" }
+    );
 
     let mut failures = Vec::new();
     if !differences.is_empty() {
@@ -640,7 +774,10 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
         ));
     }
     if !problems.is_empty() {
-        failures.push(format!("the groups' dependencies do not hold:\n  {}", problems.join("\n  ")));
+        failures.push(format!(
+            "the groups' dependencies do not hold:\n  {}",
+            problems.join("\n  ")
+        ));
     }
     if !stale.is_empty() {
         failures.push(format!(
@@ -660,7 +797,10 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
 
 /// The packages the resolver may pick: exactly today's locked builds.
 enum Universe {
-    Rpm { index: base::Index, assumed: Vec<String> },
+    Rpm {
+        index: base::Index,
+        assumed: Vec<String>,
+    },
     Apk(super::apk_lock::Index),
 }
 
@@ -673,7 +813,10 @@ impl Universe {
                 index.resolve(seeds, under.clone(), &assumed)
             }
             Universe::Apk(index) => {
-                let chosen = under.iter().map(|n| (n.clone(), index.by_name[n][0])).collect();
+                let chosen = under
+                    .iter()
+                    .map(|n| (n.clone(), index.by_name[n][0]))
+                    .collect();
                 Ok(index.resolve(seeds, chosen)?.into_keys().collect())
             }
         }
@@ -717,9 +860,16 @@ fn rpm_universe(
         .output()
         .context("running rpm -qp on the locked RPMs")?;
     if !out.status.success() {
-        bail!("rpm -qp failed: {}", String::from_utf8_lossy(&out.stderr).trim());
+        bail!(
+            "rpm -qp failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        );
     }
-    let by_name: BTreeMap<&str, (&Row, &PathBuf)> = rows.iter().zip(files).map(|(r, f)| (r.name.as_str(), (r, f))).collect();
+    let by_name: BTreeMap<&str, (&Row, &PathBuf)> = rows
+        .iter()
+        .zip(files)
+        .map(|(r, f)| (r.name.as_str(), (r, f)))
+        .collect();
     let mut pkgs: BTreeMap<String, base::Rpm> = BTreeMap::new();
     let mut meta = Meta::new();
     let text = String::from_utf8_lossy(&out.stdout);
@@ -741,7 +891,10 @@ fn rpm_universe(
             let (row, file) = by_name
                 .get(f[0])
                 .with_context(|| format!("rpm -qp read {}, which no lock row names", f[0]))?;
-            meta.insert(f[0].to_string(), (fs::metadata(file)?.len(), f[5].to_string(), false));
+            meta.insert(
+                f[0].to_string(),
+                (fs::metadata(file)?.len(), f[5].to_string(), false),
+            );
             files_of.insert(f[0].to_string(), (false, false));
             current = Some(base::Rpm {
                 name: f[0].into(),
@@ -774,13 +927,27 @@ fn rpm_universe(
         meta.get_mut(&name).unwrap().2 = var && !tmpfiles;
     }
     for row in rows {
-        let rpm = pkgs.get(&row.name).with_context(|| format!("rpm -qp did not read {}", row.file_name()))?;
+        let rpm = pkgs
+            .get(&row.name)
+            .with_context(|| format!("rpm -qp did not read {}", row.file_name()))?;
         if rpm.nevra() != row.nv {
-            bail!("{} holds {}, its lock row says {}", row.file_name(), rpm.nevra(), row.nv);
+            bail!(
+                "{} holds {}, its lock row says {}",
+                row.file_name(),
+                rpm.nevra(),
+                row.nv
+            );
         }
     }
     let rpms = pkgs.clone();
-    Ok((Universe::Rpm { index: base::Index::new(pkgs), assumed: assumed.to_vec() }, meta, rpms))
+    Ok((
+        Universe::Rpm {
+            index: base::Index::new(pkgs),
+            assumed: assumed.to_vec(),
+        },
+        meta,
+        rpms,
+    ))
 }
 
 /// What [`add_i686`] found: each group's i686 packages, and what the pin
@@ -792,7 +959,9 @@ struct Added {
 
 /// The Fedora release number of the variant's base.
 fn release_of(release: &str) -> Result<String> {
-    release.parse::<u32>().with_context(|| format!("base.release {release:?} is not a Fedora release number"))?;
+    release
+        .parse::<u32>()
+        .with_context(|| format!("base.release {release:?} is not a Fedora release number"))?;
     Ok(release.to_string())
 }
 
@@ -850,7 +1019,9 @@ fn add_i686(
         let vr = |r: &base::Rpm| format!("{}:{}-{}", r.epoch, r.version, r.release);
         // Its twin: the locked x86_64 build, else the repositories' own.
         let twin_locked = locked_rpms.contains_key(name);
-        let twin = locked_rpms.get(name).or_else(|| repo.native.get(name).map(|(r, _, _)| r));
+        let twin = locked_rpms
+            .get(name)
+            .or_else(|| repo.native.get(name).map(|(r, _, _)| r));
         let pick = match twin.filter(|t| t.arch != "noarch") {
             Some(t) => match builds.iter().find(|(b, _, _)| vr(b) == vr(t)) {
                 Some(b) => b,
@@ -881,7 +1052,11 @@ fn add_i686(
     let assumed: HashSet<&str> = assumed.iter().map(String::as_str).collect();
 
     let owner_of = |p: &str| -> String {
-        assigned.iter().find(|(_, s)| s.contains(p)).map(|(g, _)| g.to_string()).unwrap_or_else(|| "nobody".into())
+        assigned
+            .iter()
+            .find(|(_, s)| s.contains(p))
+            .map(|(g, _)| g.to_string())
+            .unwrap_or_else(|| "nobody".into())
     };
     let mut sets: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for name in order {
@@ -945,7 +1120,13 @@ fn add_i686(
             Locked {
                 row: Row {
                     name: p.clone(),
-                    nv: format!("{}-{}-{}.{}", p.trim_end_matches(".i686"), rpm.version, rpm.release, rpm.arch),
+                    nv: format!(
+                        "{}-{}-{}.{}",
+                        p.trim_end_matches(".i686"),
+                        rpm.version,
+                        rpm.release,
+                        rpm.arch
+                    ),
                     url: rpm.url.clone(),
                     sha256: rpm.sha256.clone(),
                 },
@@ -989,7 +1170,8 @@ fn read_repo(repo: &str, out: &mut RepoBuilds) -> Result<()> {
         Some(text[start..].split(close).next()?.to_string())
     };
     let href = after(section, "<location href=\"", '"').context("primary index has no location")?;
-    let sha = after(section, "<checksum type=\"sha256\">", '<').context("primary index has no sha256 checksum")?;
+    let sha = after(section, "<checksum type=\"sha256\">", '<')
+        .context("primary index has no sha256 checksum")?;
     let index = tmp.path().join("primary");
     curl(&format!("{repo}{href}"), &index)?;
     if sha256_file(&index)? != sha {
@@ -1007,7 +1189,11 @@ fn read_repo(repo: &str, out: &mut RepoBuilds) -> Result<()> {
         .stdout(std::process::Stdio::piped())
         .spawn()
         .with_context(|| format!("running {decompress}"))?;
-    parse_repo(std::io::BufReader::new(child.stdout.take().unwrap()), repo, out)?;
+    parse_repo(
+        std::io::BufReader::new(child.stdout.take().unwrap()),
+        repo,
+        out,
+    )?;
     if !child.wait()?.success() {
         bail!("decompressing {href} failed");
     }
@@ -1017,7 +1203,12 @@ fn read_repo(repo: &str, out: &mut RepoBuilds) -> Result<()> {
 fn parse_repo(reader: impl std::io::BufRead, repo: &str, out: &mut RepoBuilds) -> Result<()> {
     use quick_xml::events::Event;
 
-    let unescape = |s: &str| s.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&amp;", "&");
+    let unescape = |s: &str| {
+        s.replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&amp;", "&")
+    };
     let mut xml = quick_xml::Reader::from_reader(reader);
     let mut buf = Vec::new();
     let mut current: Option<RepoBuild> = None;
@@ -1052,8 +1243,8 @@ fn parse_repo(reader: impl std::io::BufRead, repo: &str, out: &mut RepoBuilds) -
                     }
                     b"rpm:provides" => deps = "provides",
                     b"rpm:requires" => deps = "requires",
-                    b"rpm:recommends" | b"rpm:suggests" | b"rpm:supplements" | b"rpm:enhances" | b"rpm:conflicts"
-                    | b"rpm:obsoletes" => deps = "",
+                    b"rpm:recommends" | b"rpm:suggests" | b"rpm:supplements" | b"rpm:enhances"
+                    | b"rpm:conflicts" | b"rpm:obsoletes" => deps = "",
                     b"rpm:entry" => {
                         if let (Some((rpm, _, _)), Some(n)) = (current.as_mut(), attr(b"name")) {
                             match deps {
@@ -1067,7 +1258,9 @@ fn parse_repo(reader: impl std::io::BufRead, repo: &str, out: &mut RepoBuilds) -
                     b"name" => field = Some("name"),
                     b"arch" => field = Some("arch"),
                     b"rpm:license" => field = Some("license"),
-                    b"checksum" => field = (attr(b"type").as_deref() == Some("sha256")).then_some("sha256"),
+                    b"checksum" => {
+                        field = (attr(b"type").as_deref() == Some("sha256")).then_some("sha256")
+                    }
                     b"version" => {
                         if let Some((rpm, _, _)) = current.as_mut() {
                             rpm.epoch = attr(b"epoch").unwrap_or_else(|| "0".into());
@@ -1114,7 +1307,11 @@ fn parse_repo(reader: impl std::io::BufRead, repo: &str, out: &mut RepoBuilds) -
                         "x86_64" | "noarch" => {
                             out.native.insert(build.0.name.clone(), build);
                         }
-                        "i686" => out.i686.entry(build.0.name.clone()).or_default().push(build),
+                        "i686" => out
+                            .i686
+                            .entry(build.0.name.clone())
+                            .or_default()
+                            .push(build),
                         _ => {}
                     }
                 }
@@ -1143,23 +1340,36 @@ fn apk_universe(rows: &[Row], files: &[PathBuf]) -> Result<(Universe, Meta)> {
         if !info.contains("pkgname = ") {
             bail!("{} holds no .PKGINFO", file.display());
         }
-        let mut p = super::apk_lock::Pkg { repo: "main", ..Default::default() };
+        let mut p = super::apk_lock::Pkg {
+            repo: "main",
+            ..Default::default()
+        };
         let mut license = String::new();
         for line in info.lines() {
-            let Some((k, v)) = line.split_once(" = ") else { continue };
+            let Some((k, v)) = line.split_once(" = ") else {
+                continue;
+            };
             match k {
                 "pkgname" => p.name = v.to_string(),
                 "pkgver" => p.version = v.to_string(),
                 "license" => license = v.to_string(),
                 "depend" => p.depends.push(v.to_string()),
                 "provides" => p.provides.push(v.to_string()),
-                "install_if" => p.install_if.extend(v.split_whitespace().map(str::to_string)),
+                "install_if" => p
+                    .install_if
+                    .extend(v.split_whitespace().map(str::to_string)),
                 "provider_priority" => p.priority = v.parse().unwrap_or(0),
                 _ => {}
             }
         }
         if format!("{}-{}", p.name, p.version) != row.nv {
-            bail!("{} holds {}-{}, its lock row says {}", file.display(), p.name, p.version, row.nv);
+            bail!(
+                "{} holds {}-{}, its lock row says {}",
+                file.display(),
+                p.name,
+                p.version,
+                row.nv
+            );
         }
         let list = Command::new("tar")
             .arg("-tzf")
@@ -1167,7 +1377,9 @@ fn apk_universe(rows: &[Row], files: &[PathBuf]) -> Result<(Universe, Meta)> {
             .stderr(std::process::Stdio::null())
             .output()
             .context("running tar")?;
-        let var = String::from_utf8_lossy(&list.stdout).lines().any(|l| l.starts_with("var/"));
+        let var = String::from_utf8_lossy(&list.stdout)
+            .lines()
+            .any(|l| l.starts_with("var/"));
         meta.insert(row.name.clone(), (fs::metadata(file)?.len(), license, var));
         pkgs.push(p);
     }
@@ -1200,7 +1412,11 @@ fn read_rows(path: &Path) -> Result<Vec<Row>> {
 fn locked_on(path: &Path) -> Result<String> {
     let text = fs::read_to_string(path)?;
     text.lines()
-        .find_map(|l| l.strip_prefix("fn locked_on() { \"")?.strip_suffix("\" }").map(str::to_string))
+        .find_map(|l| {
+            l.strip_prefix("fn locked_on() { \"")?
+                .strip_suffix("\" }")
+                .map(str::to_string)
+        })
         .with_context(|| format!("{} has no locked_on()", path.display()))
 }
 
@@ -1238,19 +1454,35 @@ fn read_groups(dir: &Path, libc: &str) -> Result<Vec<Group>> {
     entries.sort();
     for path in entries {
         let text = fs::read_to_string(&path)?;
-        let declared = base::declared_packages(&text).with_context(|| path.display().to_string())?;
+        let declared =
+            base::declared_packages(&text).with_context(|| path.display().to_string())?;
         // A plain-list PACKAGES is pinned by its own generator
         // (recipes/generators/desktop-runtime-pins.py), not shared out here.
-        let Some(declared) = declared.filter(|d| d.by_libc) else { continue };
+        let Some(declared) = declared.filter(|d| d.by_libc) else {
+            continue;
+        };
         let name = path.file_stem().unwrap().to_string_lossy().into_owned();
         let need = |opener: &str| {
-            literal_list(&text, opener).with_context(|| format!("{}: no literal `{opener} … ]`", path.display()))
+            literal_list(&text, opener)
+                .with_context(|| format!("{}: no literal `{opener} … ]`", path.display()))
         };
         let deps = literal_list(&text, "let deps = [").unwrap_or_default();
         let about_libc = need("    libc: [")?;
-        let added_glibc: Vec<String> = declared.glibc_i686.iter().map(|s| format!("{s}.i686")).collect();
-        let seeds = if libc == "glibc" { declared.glibc.clone() } else { declared.musl.clone() };
-        let added = if libc == "glibc" { added_glibc.clone() } else { Vec::new() };
+        let added_glibc: Vec<String> = declared
+            .glibc_i686
+            .iter()
+            .map(|s| format!("{s}.i686"))
+            .collect();
+        let seeds = if libc == "glibc" {
+            declared.glibc.clone()
+        } else {
+            declared.musl.clone()
+        };
+        let added = if libc == "glibc" {
+            added_glibc.clone()
+        } else {
+            Vec::new()
+        };
         groups.push(Group {
             name,
             path,
@@ -1263,7 +1495,10 @@ fn read_groups(dir: &Path, libc: &str) -> Result<Vec<Group>> {
         });
     }
     if groups.is_empty() {
-        bail!("{} holds no group recipe (none declares PACKAGES as a map from C library to seeds)", dir.display());
+        bail!(
+            "{} holds no group recipe (none declares PACKAGES as a map from C library to seeds)",
+            dir.display()
+        );
     }
     Ok(groups)
 }
@@ -1271,7 +1506,10 @@ fn read_groups(dir: &Path, libc: &str) -> Result<Vec<Group>> {
 /// Every group `name` depends on, directly or through another.
 fn transitive_deps<'a>(present: &BTreeMap<&'a str, &'a Group>, name: &str) -> BTreeSet<&'a str> {
     let mut seen = BTreeSet::new();
-    let mut todo: Vec<&str> = present.get(name).map(|g| g.deps.iter().map(String::as_str).collect()).unwrap_or_default();
+    let mut todo: Vec<&str> = present
+        .get(name)
+        .map(|g| g.deps.iter().map(String::as_str).collect())
+        .unwrap_or_default();
     while let Some(d) = todo.pop() {
         if let Some((key, g)) = present.get_key_value(d)
             && seen.insert(*key)
@@ -1295,8 +1533,15 @@ fn topo_order<'a>(present: &BTreeMap<&'a str, &'a Group>) -> Result<Vec<&'a str>
             }
         }
         if order.len() == before {
-            let left: Vec<&str> = present.keys().filter(|n| !placed.contains(*n)).copied().collect();
-            bail!("the group recipes' deps form a cycle among: {}", left.join(" "));
+            let left: Vec<&str> = present
+                .keys()
+                .filter(|n| !placed.contains(*n))
+                .copied()
+                .collect();
+            bail!(
+                "the group recipes' deps form a cycle among: {}",
+                left.join(" ")
+            );
         }
     }
     Ok(order)
@@ -1312,7 +1557,11 @@ struct Written {
 
 /// The section header of a C library in a pins file.
 fn section_header(libc: &str) -> &'static str {
-    if libc == "glibc" { "[glibc rpm]" } else { "[musl apk]" }
+    if libc == "glibc" {
+        "[glibc rpm]"
+    } else {
+        "[musl apk]"
+    }
 }
 
 /// Reads what [`render_pins`] wrote earlier, as much as it needs: the
@@ -1321,7 +1570,12 @@ fn read_written(text: &str) -> Written {
     let mut out = Written::default();
     if let Some(line) = text.lines().nth(1).and_then(|l| l.strip_prefix("# ")) {
         let marks = |libc: &str| [format!("{libc}: "), format!("No {libc} build")];
-        let find = |libc: &str| marks(libc).iter().filter_map(|m| line.find(m.as_str())).min();
+        let find = |libc: &str| {
+            marks(libc)
+                .iter()
+                .filter_map(|m| line.find(m.as_str()))
+                .min()
+        };
         let (g, m) = (find("glibc"), find("musl"));
         for (libc, at, other) in [("glibc", g, m), ("musl", m, g)] {
             if let Some(at) = at {
@@ -1332,7 +1586,11 @@ fn read_written(text: &str) -> Written {
     }
     for libc in ["glibc", "musl"] {
         let header = section_header(libc);
-        let mut lines = text.lines().skip_while(|l| *l != header).skip(1).take_while(|l| !l.is_empty() && !l.starts_with('['));
+        let mut lines = text
+            .lines()
+            .skip_while(|l| *l != header)
+            .skip(1)
+            .take_while(|l| !l.is_empty() && !l.starts_with('['));
         if let Some(first) = lines.next() {
             let mut body = format!("{first}\n");
             for l in lines {
@@ -1373,7 +1631,11 @@ fn render_pins(
         let built = has_build.get(l).copied().unwrap_or(false);
         let kept = written.fragments.get(l);
         if l == libc && set.is_some() {
-            let what = if l == "glibc" { format!("Fedora {release}") } else { format!("Alpine {release}") };
+            let what = if l == "glibc" {
+                format!("Fedora {release}")
+            } else {
+                format!("Alpine {release}")
+            };
             fragments.push(format!("{l}: {what}, locked {pinned_on}."));
             let mut body = String::new();
             for p in set.into_iter().flatten() {
@@ -1385,12 +1647,19 @@ fn render_pins(
                     k.bytes,
                     if k.seed { "var" } else { "-" },
                     k.row.url,
-                    if licence.is_empty() { "-" } else { licence.as_str() },
+                    if licence.is_empty() {
+                        "-"
+                    } else {
+                        licence.as_str()
+                    },
                 ));
             }
             sections.push((l, body));
         } else if l != libc && built {
-            match (kept.filter(|f| f.starts_with(&format!("{l}: "))), written.sections.get(l)) {
+            match (
+                kept.filter(|f| f.starts_with(&format!("{l}: "))),
+                written.sections.get(l),
+            ) {
                 (Some(f), Some(body)) => {
                     fragments.push(f.clone());
                     sections.push((l, body.clone()));
@@ -1399,7 +1668,11 @@ fn render_pins(
             }
         } else {
             let none = format!("No {l} build");
-            fragments.push(kept.filter(|f| f.starts_with(&none)).cloned().unwrap_or(format!("{none}.")));
+            fragments.push(
+                kept.filter(|f| f.starts_with(&none))
+                    .cloned()
+                    .unwrap_or(format!("{none}.")),
+            );
         }
     }
     let version = fragments
@@ -1430,10 +1703,21 @@ fn quote(s: &str) -> String {
 fn render_os_facts(root: &Path) -> Result<String> {
     let palette = |p: &distro_contract::Palette| {
         let roles = [
-            ("surface", &p.surface), ("surface_raised", &p.surface_raised), ("surface_sunken", &p.surface_sunken),
-            ("text", &p.text), ("text_secondary", &p.text_secondary), ("text_muted", &p.text_muted),
-            ("rule", &p.rule), ("hairline", &p.hairline), ("accent", &p.accent), ("highlight", &p.highlight),
-            ("band", &p.band), ("on_band", &p.on_band), ("ok", &p.ok), ("warn", &p.warn), ("bad", &p.bad),
+            ("surface", &p.surface),
+            ("surface_raised", &p.surface_raised),
+            ("surface_sunken", &p.surface_sunken),
+            ("text", &p.text),
+            ("text_secondary", &p.text_secondary),
+            ("text_muted", &p.text_muted),
+            ("rule", &p.rule),
+            ("hairline", &p.hairline),
+            ("accent", &p.accent),
+            ("highlight", &p.highlight),
+            ("band", &p.band),
+            ("on_band", &p.on_band),
+            ("ok", &p.ok),
+            ("warn", &p.warn),
+            ("bad", &p.bad),
         ];
         let mut t = String::from("#{\n");
         for (role, hex) in roles {
@@ -1461,7 +1745,9 @@ fn render_os_facts(root: &Path) -> Result<String> {
             PackageBackend::Apk => "apk",
         };
         if !formats.insert(format) {
-            bail!("two variants use the {format} package format; os-facts.rhai has one entry per format");
+            bail!(
+                "two variants use the {format} package format; os-facts.rhai has one entry per format"
+            );
         }
         text.push_str(&format!(
             "    // {name}: distro/variants/{id}/distro.toml\n\
