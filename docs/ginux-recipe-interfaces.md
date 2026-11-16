@@ -86,24 +86,21 @@ removed. Active leases prevent concurrent pruning.
 | Temporary files | `/work/tmp`, owned writable storage |
 | Installed target and selected products | `/out`, owned writable storage |
 
-Recipes declare `const RECIPE_API = 2;` and their own literal `const NEEDS`.
-NEEDS owns required/optional typed inputs, exact typed products, endpoint grants
-and upper limits; the coordinator reads it without evaluating setup. Setup runs once per recipe evaluation
-and reads immutable `RUNTIME`. Phase hooks receive `ctx.runtime`, resumable
-`ctx.state` and named `ctx.outputs`. Package facts come from current source.
-Readiness is `ready(ctx)` or `needs_work(ctx, reason)`; thrown errors fail the
-operation. Native errors and persisted booleans cannot masquerade as readiness.
-Dependencies run their own checks and state in separate Ginux instances with
-separate grants and state/files pairs. Callers bind `DEP::NAME` inputs explicitly;
-parent inputs/grants are never lent. Manual readiness commands require matching
-cached dependency products, validated through installed checks in graph order;
-they never repair a miss by running dependency acquire/build/install hooks.
-Those same product snapshots retain the installed parent's input identity.
-Declared outputs are snapshotted under
-`/inputs/recipe-dependencies/DEP/OUTPUT`, and directory outputs named `tools`
-contribute to the consumer's private tools prefix. Completion rechecks installation
-after success cleanup. Cleanup is optional; successful failure cleanup becomes a
-recoverable checkpoint while the original producer failure remains authoritative.
+Recipes declare `const RECIPE_API = 1;` and their own literal `const NEEDS`.
+NEEDS owns required/optional typed inputs, defines, exact typed products,
+endpoint grants and upper limits; the coordinator reads it without evaluating
+the recipe. Recipe reads the other declarations (`SOURCES`, `FILES`, `PACKAGES`,
+...) the same way, downloads and unpacks the sources itself, and calls the
+recipe's optional functions (`build(src, out)`, `configure(tree)`, `verify(out)`)
+with the engine's constants (`INPUTS`, `DEFINES`, `DEPS`, `WORK`, ...) visible.
+Package facts come from the current source. A thrown error fails the run.
+Recipe decides a program's state from its own records; no recipe code runs to
+decide it. Dependencies run in separate Ginux instances with separate grants
+and state/files pairs. Callers bind `DEP::NAME` inputs explicitly; parent
+inputs/grants are never lent. Declared dependency outputs reach the consumer
+through `DEPS`, and directory outputs named `tools` contribute to the
+consumer's `PATH`. Cleanup is optional; a failure keeps the original
+producer failure authoritative.
 
 `--input NAME=PATH` binds a declared `file`, `directory`, `file?` or
 `directory?` input. Required missing, unknown, duplicate or wrong-kind inputs fail
@@ -121,10 +118,10 @@ The worker checks returned names/kinds; the coordinator independently prepares
 and validates the export privately before committing final state/files and
 publishing fresh paths. Complete installation and installed reuse require the
 exact output set. Intermediate phases may expose a subset; every present output
-is checked before checkpoint/publication. Failed work cannot replace previous publications. Returned
-`ctx.outputs` contains those host paths; the worker never selects host destinations. The
-coordinator adds completion metadata at `ctx.runtime.contract` and
-`ctx.runtime.network_usage`, preserving ordinary top-level recipe facts. Each
+is checked before checkpoint/publication. Failed work cannot replace previous publications. The final
+result's `outputs` contains those host paths; the worker never selects host
+destinations. The coordinator adds completion metadata (contract and network
+usage) to the result. Each
 invocation saves its actual declaration/config, pins and contract in
 `authority.json`. Invocation explanations include that saved `execution`, making
 resolved bounds and caller restrictions visible alongside the declaration.

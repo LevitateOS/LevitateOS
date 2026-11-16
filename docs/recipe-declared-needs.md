@@ -22,7 +22,7 @@ Authority was selected outside the recipe:
 | Network hosts | `--network-host`, from `network_hosts`/`preseed_network_hosts` in a variant's `sources.toml`, or hard-coded by a Rust caller |
 | Memory, storage, time | `--memory-mib` etc., from `memory_mib`/`preseed_memory_mib` or caller defaults |
 | Inputs and their kinds | `--input NAME=PATH` from `inputs` in `sources.toml`, or built by callers (`pipeline/kernel.rs`, `recipe/tools.rs`, `recipe/qemu.rs`) |
-| Outputs and their kinds | `preseed_outputs` in `sources.toml`; the recipe only sets `ctx.outputs` at runtime |
+| Outputs and their kinds | `preseed_outputs` in `sources.toml`; the recipe only set `ctx.outputs` at runtime (the format before API 1) |
 | The Ginux contract | One fixed profile for every recipe: `[contract] profile = "gate5-balanced-v1"` (`tools/recipe/src/inputs/config.rs`) |
 
 The recipe itself declares `RECIPE_API`, `deps` and `build_deps`. Everything
@@ -64,7 +64,7 @@ A literal map, read from the AST like `deps` (`declared_metadata` in
 `src/core/executor.rs`), so it is known without running setup:
 
 ```rhai
-const RECIPE_API = 2;
+const RECIPE_API = 1;
 const NEEDS = #{
     inputs: #{ apks: "directory", capabilities: "file",
                system_setup: "file", os_release: "file" },
@@ -92,7 +92,7 @@ Fields (all optional; an absent field means none, or Recipe's default limit):
   their type when supplied. Explicit assets appear under `/inputs/NAME`; code,
   worker metadata and declared dependency products have separate reserved
   coordinator-owned input names.
-- `outputs`: name → `"file"` | `"directory"`. `ctx.outputs` must publish
+- `outputs`: name → `"file"` | `"directory"`. The recipe must publish
   exactly these.
 - `network`: `HOST:PORT` endpoints, the same form `--network-host` takes.
 - `memory_mib`, `storage_max_objects`, `storage_max_bytes`, `timeout_secs`,
@@ -169,7 +169,7 @@ validate too.
 **`recipe inspect RECIPE`** prints resolved authority as JSON, schematically:
 
 ```text
-alpine-live-source-rootfs  (RECIPE_API 2)
+alpine-live-source-rootfs  (RECIPE_API 1)
   inputs   apks (directory), capabilities/system_setup/os_release (file)
   outputs  rootfs (directory)
   network  none
@@ -197,7 +197,7 @@ A denial with no corresponding `NEEDS` field to edit is a Ginux question, and
 **`recipe diff OLD NEW`** compares the authority of two versions of a recipe
 (or two recipes): added and removed inputs, outputs, endpoints, raised limits,
 and the contract digest. It is meant for review: "this change now reaches a
-new host" is visible without reading the hooks.
+new host" is visible without reading the recipe.
 
 ## Implementation and release dependencies
 
