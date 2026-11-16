@@ -1,6 +1,6 @@
 # reclogin: Implementation Plan
 
-Status: **plan, written 2026-11-15 on the owner's word. No reclogin code exists yet.** It builds what these documents settle and changes none of it:
+Status: **plan, written 2026-11-15 on the owner's word. All stages are written in `tools/reclogin`, including the guest account; none was built into an image or run, and it is not switched in (SDDM is still the login screen). What remains is in `tools/reclogin/dist/recipe/SWITCH.md`.** It builds what these documents settle and changes none of it:
 
 - `docs/reclogin.md`: what reclogin is, the screens, the owner's decisions.
 - `docs/reclogin-guest.md`: the guest account.

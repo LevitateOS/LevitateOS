@@ -2,7 +2,7 @@
 
   python3 -B -I check.py all pages_system            every page
   python3 -B -I check.py app:disk-plan pages_system  one app's pages (install screen,
-                                                     disk-plan, base-system, system-setup, recab, guide)
+                                                     disk-plan, base-system, system-setup, guide)
   python3 -B -I check.py "2 Time zone" pages_system  pages whose name contains the text
   python3 -B -I check.py over pages_system           only pages whose content overflows"""
 import sys

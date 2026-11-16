@@ -8,7 +8,6 @@ APPS = [
     ("disk-plan", "Disk", "Choosing, reviewing and writing the disk layout, on top of recpart."),
     ("base-system", "Base system", "Copying the system and writing its fstab, on top of recstrap and recfstab."),
     ("system-setup", "Configuration", "Keyboard, time zone, language, hostname, passwords and a user, on top of recsetup."),
-    ("recab", "Updates", "The installed system's A/B slots, on top of recab."),
     ("guide", "Guide", "The docs, beside the root terminal or on their own."),
 ]
 RULES = [
@@ -74,7 +73,7 @@ open(sys.argv[1], "w").write(f"""<!doctype html>
   .term span {{ display: inline-block; white-space: pre; }}
 </style></head><body><main>
 <h1>Every screen, one design</h1>
-<p>{len(PAGES)} pages across the install screen and six apps, drawn as mock-ups from one set of parts, so that no page can drift from another. This is the third pass, for balance: each page keeps the one picture of what it does and loses what competed with it. They are designs, not captures: every value in them is sample data, and nothing here is built beyond what system-setup already has.</p>
+<p>{len(PAGES)} pages across the install screen and four apps, drawn as mock-ups from one set of parts, so that no page can drift from another. This is the third pass, for balance: each page keeps the one picture of what it does and loses what competed with it. They are designs, not captures: every value in them is sample data, and nothing here is built beyond what system-setup already has.</p>
 <nav>{''.join(f'<a href="#{key.replace(" ", "-")}">{html.escape(title)}</a>' for key, title, _ in APPS)}</nav>
 <ol class="rules">{''.join(f'<li><b>{html.escape(name)}</b>{html.escape(text)}</li>' for name, text in RULES)}</ol>
 {''.join(body)}

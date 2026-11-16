@@ -1,4 +1,4 @@
-"""system-setup, recab, the guide, and the install screen: a root terminal and the guide.
+"""system-setup, the guide, and the install screen: a root terminal and the guide.
 
 Third pass: balance. Each page keeps the one picture of what it does, and loses whatever
 competed with it."""
@@ -258,120 +258,6 @@ def system_setup_pages():
     page("system-setup", "2 Time zone, AcornOS", "The same page on AcornOS: its band and its accent, nothing else differs.", zone_page("acorn"))
 
 
-# ====================================================================== recab
-def recab(selected, trial=False, keys=None, right=None, history=""):
-    p = Deliberate()
-    place = ["Overview", "Try slot B", "Commit", "Roll back", "Write a system", "Reboot", "History"][selected]
-    p.band("Updates", place)
-    seg = (p.cols - 2 - 1) // 2
-    for i, (name, state) in enumerate([("Slot A", "running"), ("Slot B", "next" if trial else "idle")]):
-        colour = {"running": p.accent, "next": p.highlight, "idle": RULE}[state]
-        p.fill(2, 1 + i * (seg + 1), seg, colour)
-        p.put(2, 3 + i * (seg + 1), name, ON_FILL if state != "idle" else MUTED, bold=state != "idle")
-    p.menu([
-        (None, [("Overview", "none", "o")]),
-        ("Changes", [("Try slot B", "ready", "t"), ("Commit slot A", "todo", "c"), ("Roll back to B", "ready", "x"), ("Write to slot B", "ready", "s"), ("Reboot", "ready", "R")]),
-        (None, [("History" + history, "none", "H")]),
-    ], selected)
-    p.keys(keys or [("j/k", "select"), ("Enter", "run it"), ("r", "read again"), ("q", "quit")], right or "running slot A")
-    return p
-
-
-def two_slots(p, a, b, h=5):
-    """The two slots as blocks, side by side: the picture every recab page is about."""
-    w = (p.w - 3) // 2
-    p.slotbox(p.x, p.y, w, h, "A", a[1], a[2], a[0])
-    p.slotbox(p.x + w + 3, p.y, w, h, "B", b[1], b[2], b[0])
-    p.y += h + 1
-
-
-def fork(p, bg=None):
-    """A trial boot as a fork: one line in, two ways out."""
-    p.put(p.y, p.x, "reboot ─▶", MUTED, bg)
-    p.put(p.y, p.x + 10, " slot B, once ", ON_FILL, p.highlight, bold=True)
-    p.put(p.y, p.x + 25, "─┬─ starts healthy ─▶", MUTED, bg)
-    p.put(p.y, p.x + 47, "B is kept", OK, bg, bold=True)
-    p.put(p.y + 1, p.x + 26, "└─ does not ──────▶", MUTED, bg)
-    p.put(p.y + 1, p.x + 47, "back to slot A", TEXT, bg, bold=True)
-    p.y += 3
-
-
-def recab_pages():
-    p = page("recab", "Overview", "The two slots, and one line: what boots next.", recab(0))
-    p.heading(None, "Two systems, one running", "An update is written to the other slot and tried once before it is kept.")
-    two_slots(p, ("running", [("LevitateOS 1.0", TEXT), ("known-good", SECONDARY)], "running"), ("idle", [("the previous system", TEXT), ("last trial failed, 5 Nov", SECONDARY)], ""))
-    p.runs(p.y, p.x, [("Next boot  ", MUTED), ("slot A", TEXT, True), ("      Roll back goes to  ", MUTED), ("slot B", TEXT, True)])
-
-    p = page("recab", "Overview, a trial pending", "Slot B takes the second accent everywhere at once, and the one line becomes the fork.", recab(0, trial=True))
-    p.heading(None, "Slot B boots next, once", "A trial: kept if it starts healthy, undone if it does not.")
-    two_slots(p, ("running", [("LevitateOS 1.0", TEXT), ("known-good", SECONDARY)], "running"), ("next", [("LevitateOS 1.1", TEXT), ("written today, never booted", SECONDARY)], "next boot"))
-    fork(p)
-    p.button("Reboot into the trial", key="R")
-
-    p = page("recab", "Try slot B", "Before a change: the fork it sets up, and the bar.", recab(1))
-    p.heading(None, "Try slot B on the next boot", "Boot it once and see. Slot A stays as it is.")
-    p.gap()
-    fork(p)
-    p.gap()
-    p.commands(["recab set-next B"])
-    p.button("Set slot B for the next boot")
-
-    p = page("recab", "Try slot B, asking", "The yes-or-no, over the same fork.", recab(1, keys=CONFIRM_KEYS))
-    p.heading(None, "Try slot B on the next boot", "Boot it once and see. Slot A stays as it is.")
-    p.panel("warning", "Run recab set-next B?", keys=[("y", "run it"), ("n", "cancel")])
-    fork(p)
-
-    p = page("recab", "Try slot B, done", "After a change: the slots as they now are, and the bar to act on it.", recab(1, trial=True, history=" · 1"))
-    p.heading("check", "Slot B boots next, once", "Reboot to start the trial.", OK)
-    two_slots(p, ("running", [("stays the default", SECONDARY), ("stays known-good", SECONDARY)], "running"), ("next", [("boots once", TEXT), ("kept only if healthy", SECONDARY)], "next boot"))
-    p.button("Reboot into the trial", key="R")
-
-    p = page("recab", "Roll back, refused", "A change recab would refuse says so before you press anything, with the reason on the slot it is about.", recab(3))
-    p.heading("bang", "Nothing to roll back to", "recab would refuse this now.", BAD)
-    two_slots(p, ("running", [("committed", SECONDARY), ("the only known-good system", SECONDARY)], "running"), ("idle", [("written today, never booted", TEXT), ("not known-good", BAD)], ""))
-    p.text("A roll back goes to a system that has already run well. Try slot B first.", SECONDARY)
-
-    p = page("recab", "Write a system, choosing", "Where the new system comes from is a choice from what is plugged in.", recab(4, keys=[("↑/↓", "select"), ("Enter", "choose"), ("Esc", "cancel")]))
-    p.heading(None, "Write a new system to slot B", "Your accounts, hostname, network and services are carried over.")
-    for title, where, parts, chosen in [("LevitateOS 1.1 release media", "/dev/sr0", "image, kernel and initramfs found", True),
-                                        ("LevitateOS 1.0 release media", "/dev/sdb", "the version slot A runs", False), ("An image file…", "", "choose the three files by hand", False)]:
-        if chosen:
-            p.card(p.x, p.y, p.w, 2, RAISED)
-            p.put(p.y, p.x, "▌", p.accent, RAISED)
-            p.put(p.y + 1, p.x, "▌", p.accent, RAISED)
-        bg = RAISED if chosen else None
-        p.put(p.y, p.x + 2, title, TEXT, bg, bold=chosen)
-        p.put(p.y, p.x + p.w - 2 - len(where), where, MUTED, bg)
-        p.put(p.y + 1, p.x + 2, parts, SECONDARY if chosen else MUTED, bg)
-        p.y += 3
-
-    p = page("recab", "Write a system, the last word", "Formatting a slot asks for a typed word like every destructive step: here, the slot's letter.",
-             recab(4, keys=[("B", "type it"), ("Enter", "write, once unlocked"), ("Esc", "cancel")]))
-    p.heading(None, "Write over slot B?", "The previous system in it is gone, and with it the roll back.", BAD)
-    two_slots(p, ("running", [("untouched", SECONDARY), ("keeps running", SECONDARY)], "running"), ("idle", [("erased", BAD), ("then LevitateOS 1.1", TEXT)], "formatted"))
-    p.wordslots("B", "")
-
-    p = page("recab", "Write a system, running", "The same figure and bar as the install's copy.", recab(4, keys=[("q", "wait for it")], right="writing slot B"))
-    p.heading(None, "Writing slot B", "Slot A keeps running.")
-    p.gap()
-    p.figure("38%", x=p.x, row=p.y)
-    top = p.y
-    p.y = top - 1
-    p.facts([("Files", "18,320 of 48,213"), ("Written", "1.2 of about 3.1 GiB"), ("Elapsed", "0:17"), ("Left", "about 0:28")], x=p.x + 26)
-    p.y = top + 5
-    p.bar(0.38)
-
-    p = page("recab", "History", "What ran, down a line, newest first.", recab(6, history=" · 3"))
-    p.heading(None, "This session", "recab keeps its own log in /var/lib/recab/audit.log.")
-    p.timeline([("14:09:40", "done", "Slot B set for the next boot", "recab set-next B"), ("14:02:11", "done", "LevitateOS 1.1 written to slot B", "recab stage --from-media /dev/sr0"),
-                ("14:01:48", "failed", "Roll back refused", "slot B had never been known-good")])
-
-    p = page("recab", "No A/B here", "A system with one root has no slots: one block instead of two, and why.", recab(0, right="no slots"))
-    p.heading("bang", "This system has one root", "It was installed as mutable: there are no slots to manage.", BAD)
-    p.slotbox(p.x, p.y, p.w, 5, "root", [("one system, changed in place", TEXT), ("updates cannot be tried first or rolled back", SECONDARY)], "running", "idle")
-    p.note("Installed as A/B? Then /boot may not be mounted.")
-
-
 # ====================================================================== the guide
 GUIDE = ["Getting Started", "Installation", "Disk Preparation", "Base System", "Configuration", "Boot & Finish", "Post-Installation", "Troubleshooting"]
 
@@ -470,5 +356,4 @@ def install_screen_pages():
 install_screen_pages()
 PAGES.extend(_INSTALL)
 system_setup_pages()
-recab_pages()
 guide_pages()

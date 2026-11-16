@@ -2,7 +2,7 @@
 
 A design, drawn as mock-ups from one set of parts: the install screen's apps and the other terminal apps. The mock-ups are the design; this page is its rules and what building it needs.
 
-**Parts of the mock-ups are out of date.** They were drawn before two decisions in [`docs/product-handoff.md`](../product-handoff.md): the install hub is gone (the install screen is a root terminal beside the guide, section 2.1), and recab has no terminal app and no update lifecycle (section 2.2). The pages named "Hub" and "Updates" in `pages_install.py` and `pages_system.py` show the removed designs. They are kept as a record of the layout, not as something to build. The disk-plan, base-system, system-setup and guide pages still stand.
+**Parts of the mock-ups are out of date.** They were drawn before a decision in [`docs/product-handoff.md`](../product-handoff.md): the install hub is gone (the install screen is a root terminal beside the guide, section 2.1). The pages named "Hub" in `pages_install.py` show the removed design. They are kept as a record of the layout, not as something to build. The recab pages ("Updates") were deleted on 2026-11-16, because recab has no terminal app (section 2.2). The disk-plan, base-system, system-setup and guide pages still stand.
 
 ```sh
 cd docs/tui-design

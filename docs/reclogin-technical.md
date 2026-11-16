@@ -1,6 +1,6 @@
 # reclogin: Technical Design
 
-Status: **approved by the owner on 2026-11-15. Nothing is built. Its five assumptions were tried on both OSes on 2026-11-15 and held (section 10).** It turns the decisions in `docs/reclogin.md` and `docs/reclogin-guest.md` into parts, and names what the first implementation step has to show before the rest is worth writing. It authorizes no programming by itself.
+Status: **approved by the owner on 2026-11-15. Since then it is written in `tools/reclogin` (`reclogind` and `reclogin-greeter`), never built into an image or run, and not switched in: SDDM is still the login screen on both OSes. What remains is in `tools/reclogin/dist/recipe/SWITCH.md`. Its five assumptions were tried on both OSes on 2026-11-15 and held (section 10).** It turns the decisions in `docs/reclogin.md` and `docs/reclogin-guest.md` into parts, and names what the first implementation step has to show before the rest is worth writing. It authorizes no programming by itself.
 
 Facts it rests on, read in the source on 2026-11-15:
 

@@ -159,13 +159,13 @@ def disk_plan_pages():
     p.diskbar(after(p), 476, selected=2)
     left = p.w - 25
     top = p.y
-    rows = [["nvme0n1p1", "260 MiB", "EFI", "kept"], ["nvme0n1p3", "300.0 GiB", "Windows", "shrunk"], ["(new)", "30.0 GiB", "Slot A", "new"],
-            ["(new)", "30.0 GiB", "Slot B", "new"], ["(new)", "115.9 GiB", "State", "new"], ["nvme0n1p4", "750 MiB", "", "kept"]]
+    rows = [["nvme0n1p1", "260 MiB", "EFI", "kept"], ["nvme0n1p3", "300.0 GiB", "Windows", "shrunk"], ["(new)", "30.0 GiB", "Root A", "new"],
+            ["(new)", "30.0 GiB", "Root B", "new"], ["(new)", "115.9 GiB", "State", "new"], ["nvme0n1p4", "750 MiB", "", "kept"]]
     p.table(["Partition", "Size", "Used as", "Change"], rows, aligns=["l", "r", "l", "l"], selected=2, colours=[MUTED, WARN, None, None, None, MUTED])
     nx = p.x + left + 2
     p.card(nx, top, 23, 7)
     p.put(top + 1, nx + 2, "A/B needs", SECONDARY, SURFACE, bold=True)
-    for i, (need, got) in enumerate([("EFI", "kept"), ("Slot A", "30.0 GiB"), ("Slot B", "30.0 GiB"), ("State", "115.9 GiB")]):
+    for i, (need, got) in enumerate([("EFI", "kept"), ("Root A", "30.0 GiB"), ("Root B", "30.0 GiB"), ("State", "115.9 GiB")]):
         p.put(top + 2 + i, nx + 2, "✓", OK, SURFACE)
         p.put(top + 2 + i, nx + 4, need, TEXT, SURFACE)
         p.put(top + 2 + i, nx + 21 - len(got), got, MUTED, SURFACE)
@@ -215,7 +215,7 @@ def disk_plan_pages():
     runsheet(p, upto=5, failed=6)
     p.gap()
     p.text("mkfs.ext4: /dev/nvme0n1p6: Input/output error", BAD)
-    p.text("Windows is shrunk and intact. Slot A is formatted; slot B and state are not.", SECONDARY)
+    p.text("Windows is shrunk and intact. Root A is formatted; root B and state are not.", SECONDARY)
     p.note("Check the disk, then plan again from step 5.")
 
     p = page("disk-plan", "10 Done", "The disk you now have, with where each part is mounted, and one bar on.", dp(10, 10, right="/mnt"))
@@ -249,7 +249,7 @@ CHECKS = [("The target", ["mounted", "empty", "writable", "room for the system"]
 def base_system_pages():
     p = page("base-system", "Overview", "The image, an arrow, the target.", bs(0, 1))
     p.heading(None, "Copy the system onto the disk", "Check the target, copy the system to it, write down its mounts.")
-    from_to(p, ("The live image", ["/run/live-rootfs.erofs", "1.4 GiB, LevitateOS 1.0"]), ("/mnt", ["/dev/nvme0n1p5, slot A", "30.0 GiB, empty"]))
+    from_to(p, ("The live image", ["/run/live-rootfs.erofs", "1.4 GiB, LevitateOS 1.0"]), ("/mnt", ["/dev/nvme0n1p5, root A", "30.0 GiB, empty"]))
     p.button("Check the target")
 
     p = page("base-system", "1 Check", "Room as a gauge, and the checks by name.", bs(1, 2))
