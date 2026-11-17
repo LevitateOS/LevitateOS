@@ -82,6 +82,7 @@ pub fn run(args: RunArgs) -> Result<()> {
         (false, false) => Mode::Console,
     };
     let options = RunOptions {
+        install_mode: args.mode,
         flavour: args.artifacts.flavour,
         release_run: args.artifacts.release_run,
         install_run: args.artifacts.install_run,

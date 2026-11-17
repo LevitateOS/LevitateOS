@@ -593,6 +593,9 @@ pub struct RunArgs {
     /// Host port forwarded to the guest's SSH (with --ssh). Default: a free one.
     #[arg(long, requires = "ssh")]
     pub ssh_port: Option<u16>,
+    /// The layout of the install run test-installed-boot boots (live scenarios ignore it).
+    #[arg(long, value_enum, default_value_t = recpart::InstallMode::Ab)]
+    pub mode: recpart::InstallMode,
 }
 
 /// Boot injection and the SSH key the guest trusts.
