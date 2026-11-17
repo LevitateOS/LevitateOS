@@ -148,8 +148,12 @@ writing its own.
    and change its description so it no longer says "for LevitateOS"
    (decision 4). The `generate-rpm` metadata and the doc paths under
    `/usr/share/doc` follow the rename.
-6. **A local release command.** `cargo xtask release recipe <version>` builds
-   static `recipe` and `recipe-image` and the launcher at the Ginux pin, stages
+6. **A local release command.** `cargo xtask release recipe <version>` takes the
+   static `recipe` through `distro-builder prebuilt get tools levitate-recipe`
+   (the local cache when it holds the current key, else the published release
+   `tools-<key16>` of `LevitateOS/prebuilt`, verified like an image build does, else
+   a compile; `provenance.json` records the key in `recipe_prebuilt_key` and which of
+   the three in `recipe_prebuilt_source`), builds `recipe-image` and `recipe-image` and the launcher at the Ginux pin, stages
    the runtime tree, packs the formats of decision 2 (tarball, RPM, APK,
    `.deb`; the AUR and Void build files get the new checksums), and publishes
    the GitHub release of `LevitateOS/recipe`. Products are built locally, not in CI

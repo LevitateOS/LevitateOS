@@ -28,6 +28,10 @@ pub fn run(cmd: PrebuiltCmd) -> Result<()> {
         PrebuiltCmd::PublishRuntime => {
             crate::util::distro_builder::run_unprivileged(&root, &Command::PrebuiltPublishRuntime)
         }
+        PrebuiltCmd::Get(args) => crate::util::distro_builder::run(
+            &root,
+            &command(args, |family, name, distro| Command::PrebuiltGet { family, name, distro }),
+        ),
         PrebuiltCmd::Build(args) => crate::util::distro_builder::run(
             &root,
             &command(args, |family, name, distro| Command::PrebuiltBuild { family, name, distro }),

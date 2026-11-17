@@ -35,7 +35,8 @@ provenance.json and RELEASE_NOTES.md, into .artifacts/recipe-release/<version>/.
 
   --version V        release version (default: version in tools/recipe/Cargo.toml)
   --out DIR          output folder (default .artifacts/recipe-release/<version>; must be empty)
-  --recipe-bin FILE  use this recipe instead of building the static one with distro-builder
+  --recipe-bin FILE  use this recipe instead of the static one from distro-builder (the published
+                     prebuilt tools-<key16> of the current key when one exists, else compiled here)
                      (not static: the release is marked unofficial and cannot be published)
   --launcher FILE    use this Ginux launcher instead of building tools/ginux
   --publish          create the GitHub release in LevitateOS/recipe (official builds only)";
@@ -121,11 +122,14 @@ pub fn run(args: Vec<String>) -> Result<()> {
     // Inputs.
     let mut inputs = serde_json::Map::new();
     let mut recipe_key = None;
+    let mut recipe_source = None;
     let (recipe_bin, recipe_origin) = match &args.recipe_bin {
         Some(p) => (p.clone(), "--recipe-bin"),
         None => {
-            let (key, dir) = build_recipe(&root)?;
+            let (key, dir, source) = build_recipe(&root)?;
+            println!("input    recipe-key    {key}  ({source})");
             recipe_key = Some(key);
+            recipe_source = Some(source);
             (dir.join("recipe"), "distro-builder prebuilt")
         }
     };
@@ -133,7 +137,7 @@ pub fn run(args: Vec<String>) -> Result<()> {
     if !is_static_x86_64_elf(&recipe_bin)? {
         let msg = format!("{} is not a static x86_64 ELF (it would not run on any x86_64 Linux)", recipe_bin.display());
         if args.recipe_bin.is_none() {
-            bail!("{msg}; `distro-builder prebuilt build tools levitate-recipe` should produce a static musl binary, check its output");
+            bail!("{msg}; `distro-builder prebuilt get tools levitate-recipe` should produce a static musl binary, check its output");
         }
         eprintln!("WARNING: {msg}. This release is marked \"official\": false and cannot be published.");
         official = false;
@@ -253,6 +257,7 @@ pub fn run(args: Vec<String>) -> Result<()> {
         "runtime_release": format!("recipe-runtime-{short}"),
         "recipe_origin": recipe_origin,
         "recipe_prebuilt_key": recipe_key,
+        "recipe_prebuilt_source": recipe_source,
         "inputs": inputs,
         "assets": asset_info,
         "superproject_commit_time": built,
@@ -334,20 +339,25 @@ fn is_static_x86_64_elf(path: &Path) -> Result<bool> {
     Ok(true)
 }
 
-fn build_recipe(root: &Path) -> Result<(String, PathBuf)> {
-    println!("building the static recipe: distro-builder prebuilt build tools levitate-recipe");
+/// The static Recipe through `distro-builder prebuilt get tools levitate-recipe`: the local
+/// cache when it holds the current key, else the published release `tools-<key16>`, else
+/// a compile. Returns the key, the cache directory and the builder's line saying which
+/// (`from the local cache`, `downloaded tools-<key16>` or `compiled here`).
+fn build_recipe(root: &Path) -> Result<(String, PathBuf, String)> {
+    println!("getting the static recipe: distro-builder prebuilt get tools levitate-recipe");
     let builder = crate::util::repo::cargo_bin(root, "distro-builder", "distro-builder")?;
     let out = Command::new(builder)
-        .args(["prebuilt", "build", "tools", "levitate-recipe"])
+        .args(["prebuilt", "get", "tools", "levitate-recipe"])
         .current_dir(root)
         .stderr(std::process::Stdio::inherit())
         .output()
         .context("running distro-builder")?;
-    ensure!(out.status.success(), "distro-builder prebuilt build tools levitate-recipe failed ({}); fix that, or pass --recipe-bin FILE for an unofficial release", out.status);
+    ensure!(out.status.success(), "distro-builder prebuilt get tools levitate-recipe failed ({}); fix that, or pass --recipe-bin FILE for an unofficial release", out.status);
     let text = String::from_utf8_lossy(&out.stdout);
     let lines: Vec<&str> = text.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
-    ensure!(lines.len() >= 2, "distro-builder printed no key and cache directory (got: {text:?})");
-    Ok((lines[lines.len() - 2].to_string(), PathBuf::from(lines[lines.len() - 1])))
+    ensure!(lines.len() >= 3, "distro-builder printed no key, cache directory and origin (got: {text:?})");
+    let n = lines.len();
+    Ok((lines[n - 3].to_string(), PathBuf::from(lines[n - 2]), lines[n - 1].to_string()))
 }
 
 fn build_launcher(root: &Path, ginux_dir: &Path) -> Result<PathBuf> {

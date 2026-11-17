@@ -498,6 +498,10 @@ pub enum PrebuiltCmd {
     /// Compile a prebuilt into the local cache (no download, no ISO) and print its key and
     /// cache directory; what CI publishes. Needs root, like every compile.
     Build(PrebuiltArgs),
+    /// Take a tool package like an image build does (local cache, else a download of the
+    /// release tools-<key16>, else a compile) and print its key, cache directory and where
+    /// it came from. Elevates like `build`, since it may compile.
+    Get(PrebuiltArgs),
     /// Upload the local cache entry of a prebuilt's current key to the prebuilt repository
     /// (LEVITATE_PREBUILT_REPO, default LevitateOS/prebuilt) with gh; never replaces an
     /// asset that differs. Build it first (an ISO build, or `build ... --no-prebuilt`).
