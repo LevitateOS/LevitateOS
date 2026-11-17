@@ -345,17 +345,12 @@ fn is_static_x86_64_elf(path: &Path) -> Result<bool> {
 /// (`from the local cache`, `downloaded tools-<key16>` or `compiled here`).
 fn build_recipe(root: &Path) -> Result<(String, PathBuf, String)> {
     println!("getting the static recipe: distro-builder prebuilt get tools levitate-recipe");
-    let builder = crate::util::repo::cargo_bin(root, "distro-builder", "distro-builder")?;
-    let out = Command::new(builder)
-        .args(["prebuilt", "get", "tools", "levitate-recipe"])
-        .current_dir(root)
-        .stderr(std::process::Stdio::inherit())
-        .output()
-        .context("running distro-builder")?;
-    ensure!(out.status.success(), "distro-builder prebuilt get tools levitate-recipe failed ({}); fix that, or pass --recipe-bin FILE for an unofficial release", out.status);
-    let text = String::from_utf8_lossy(&out.stdout);
+    let command = distro_builder::cli::Command::PrebuiltGet { family: "tools".into(), name: "levitate-recipe".into(), distro: None };
+    let text = crate::util::distro_builder::run_capture(root, &command)
+        .context("getting the static recipe failed; fix that, or pass --recipe-bin FILE for an unofficial release")?;
+    // `prebuilt get` ends with three lines: the key, the cache directory, the origin.
     let lines: Vec<&str> = text.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
-    ensure!(lines.len() >= 3, "distro-builder printed no key, cache directory and origin (got: {text:?})");
+    ensure!(lines.len() >= 3, "distro-builder prebuilt get printed no key, cache directory and origin (got: {text:?})");
     let n = lines.len();
     Ok((lines[n - 3].to_string(), PathBuf::from(lines[n - 2]), lines[n - 1].to_string()))
 }

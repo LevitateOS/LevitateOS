@@ -7,19 +7,47 @@ use std::path::Path;
 
 /// Run distro-builder.
 pub fn run(root: &Path, command: &Command) -> Result<()> {
+    let (bin, args, mut cmd) = prepare(root, command)?;
+    let status = cmd
+        .status()
+        .with_context(|| format!("running {}", bin.display()))?;
+    check(status, &args)
+}
+
+/// Run distro-builder like [`run`] (same elevation, environment and `--repo-root`), and
+/// return what it printed on standard output; its standard error still goes to the terminal.
+pub fn run_capture(root: &Path, command: &Command) -> Result<String> {
+    let (bin, args, mut cmd) = prepare(root, command)?;
+    let out = cmd
+        .stderr(std::process::Stdio::inherit())
+        .output()
+        .with_context(|| format!("running {}", bin.display()))?;
+    check(out.status, &args)?;
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// The builder binary, its arguments and the command that starts it (elevated when the
+/// current user is not root).
+fn prepare(root: &Path, command: &Command) -> Result<(std::path::PathBuf, Vec<std::ffi::OsString>, std::process::Command)> {
     let bin = crate::util::repo::cargo_bin(root, "distro-builder", "distro-builder")?;
     let args = command.to_args(root);
-    let elevated = unsafe { libc::geteuid() } != 0;
-    let mut cmd = if elevated {
+    let mut cmd = if elevated() {
         sudo_command(root, &bin)
     } else {
         std::process::Command::new(&bin)
     };
     cmd.args(&args);
-    let status = cmd
-        .status()
-        .with_context(|| format!("running {}", bin.display()))?;
-    if elevated && status.code() == Some(1) && !sudo_works_without_password() {
+    Ok((bin, args, cmd))
+}
+
+fn elevated() -> bool {
+    (unsafe { libc::geteuid() }) != 0
+}
+
+/// Fails with the builder's command line when it did not succeed, and with the sudo
+/// message when sudo itself refused to start it.
+fn check(status: std::process::ExitStatus, args: &[std::ffi::OsString]) -> Result<()> {
+    if elevated() && status.code() == Some(1) && !sudo_works_without_password() {
         bail!(
             "sudo needs a password, so the builder (which needs root: the Ginux coordinator \
              runs privileged) did not start; configure passwordless sudo for this user \
