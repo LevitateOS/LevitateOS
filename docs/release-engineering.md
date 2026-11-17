@@ -186,8 +186,10 @@ Recipe alone and Recipe replaces its own files.
 6. **App buttons show the system release** that carries the newer app. Apps
    are not published or updated on their own.
 7. **System groups change only with a release.** Each release carries its own
-   copy of the group recipes (desktop, audio, printing, Steam's libraries,
-   ...), in the base at `/usr/lib/recipe/release-recipes/`, and a system uses
+   copy of the recipes pinned to its package snapshot or making up the system
+   (every package group for its OS, apps such as konsole included, every other
+   `system` or `library` recipe, and all their dependencies), in the base at
+   `/usr/lib/recipe/release-recipes/`, and a system uses
    that copy: to install a group later, and to decide that nothing newer is
    offered between releases. The public catalog never updates a system group
    on an installed system. Apps and tools keep updating from the catalog.

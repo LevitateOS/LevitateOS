@@ -92,6 +92,9 @@ packages = [
   "busybox",
   "openrc",
   "doas",
+  # The login path: reclogin's /etc/pam.d/reclogin (tools/reclogin/dist/pam)
+  # includes base-auth and its siblings, which linux-pam ships.
+  "linux-pam",
   "bash",
   "bash-completion",
   "coreutils",
