@@ -44,6 +44,9 @@ pub struct Verified {
     pub manifest: Manifest,
     pub bytes: Vec<u8>,
     pub sig: Vec<u8>,
+    /// The channel itself was fetched over plain http (a local or test channel), so its
+    /// archives may be too.
+    pub plain_http: bool,
 }
 
 pub struct OsRelease {
@@ -170,6 +173,7 @@ pub fn load_channel() -> Result<Verified> {
         installed.serial
     );
     Ok(Verified {
+        plain_http: url.starts_with("http://"),
         manifest,
         bytes,
         sig: sig_text,

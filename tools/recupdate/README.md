@@ -28,7 +28,7 @@ may verify; an empty folder refuses everything), and only then is the JSON parse
 `schema` must be 1, `os` must equal the os-release `ID`, and `serial` must not be lower
 than the installed one. Archives are downloaded to `<name>.part` (at most the manifest's
 `size`, exactly that at the end), checked against the manifest's SHA-256, then renamed.
-Manifest URLs must be https. A resumed `apply` checks the cached `release.json` against its
+Manifest URLs must be https, except that a channel given as an `http://` address (a local or test channel via `RECUPDATE_CHANNEL_URL`) may list `http://` archives; the public https channel never can. A resumed `apply` checks the cached `release.json` against its
 `.sig` and the keys again.
 
 ## `recupdate apply` (mutable installations)

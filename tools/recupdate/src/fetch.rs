@@ -93,7 +93,7 @@ pub fn into_cache(channel: &Verified, report: &Report) -> Result<PathBuf> {
     ];
     for (i, (name, archive, text)) in parts.iter().enumerate() {
         (report.step)(i as u32 + 1, text);
-        get_archive(&dir, name, archive, report)?;
+        get_archive(&dir, name, archive, channel.plain_http, report)?;
     }
 
     // The verified manifest and its signature go last: their presence marks a complete fetch.
@@ -115,10 +115,16 @@ pub fn into_cache(channel: &Verified, report: &Report) -> Result<PathBuf> {
     Ok(dir)
 }
 
-fn get_archive(dir: &Path, name: &str, archive: &Archive, report: &Report) -> Result<()> {
+fn get_archive(
+    dir: &Path,
+    name: &str,
+    archive: &Archive,
+    plain_http: bool,
+    report: &Report,
+) -> Result<()> {
     ensure!(
-        archive.url.starts_with("https://"),
-        "the manifest's address for {name} is not https: {}",
+        archive.url.starts_with("https://") || (plain_http && archive.url.starts_with("http://")),
+        "the manifest's address for {name} is not allowed: {} (https is required; http is accepted only when the channel itself is an http:// address)",
         archive.url
     );
     ensure!(
