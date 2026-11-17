@@ -54,12 +54,19 @@ pub fn write_atomic(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
         file.sync_all()?;
         fs::set_permissions(&tmp, fs::Permissions::from_mode(mode))?;
         fs::rename(&tmp, path).with_context(|| format!("replacing {}", path.display()))?;
-        Ok(())
+        sync_dir(dir)
     })();
     if result.is_err() {
         let _ = fs::remove_file(&tmp);
     }
     result
+}
+
+/// Make renames and removals in `dir` durable; a power cut can otherwise undo them.
+pub fn sync_dir(dir: &Path) -> Result<()> {
+    fs::File::open(dir)
+        .and_then(|folder| folder.sync_all())
+        .with_context(|| format!("syncing {}", dir.display()))
 }
 
 /// The first executable called `name` on PATH.

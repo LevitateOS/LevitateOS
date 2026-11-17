@@ -81,7 +81,22 @@ fn clear_intent() -> Result<()> {
         Err(e) if e.kind() != ErrorKind::NotFound => {
             Err(anyhow!(e).context(format!("removing {}", path.display())))
         }
-        _ => Ok(()),
+        Err(_) => Ok(()),
+        // Without the folder sync a power cut can bring the record back.
+        Ok(()) => crate::util::sync_dir(&crate::check::state_dir()),
+    }
+}
+
+/// Delete temp files of the intent record left by a dead earlier apply.
+fn remove_stale_temps() {
+    let prefix = format!(".{INTENT}.tmp-");
+    let Ok(entries) = fs::read_dir(crate::check::state_dir()) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        if entry.file_name().to_string_lossy().starts_with(&prefix) {
+            let _ = fs::remove_file(entry.path());
+        }
     }
 }
 
@@ -180,6 +195,8 @@ fn apply(report: Report) -> Result<()> {
     );
     crate::boot::require_mutable()?;
     let _lock = lock()?;
+    // Holding the lock, no other apply can own these temp files, so they are leftovers.
+    remove_stale_temps();
     // Everything the boot step needs is checked before the first change.
     crate::boot::prepare()?;
 
