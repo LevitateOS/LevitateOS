@@ -110,6 +110,17 @@ fn decode_b64(text: &[u8]) -> Result<Vec<u8>> {
         .context("not valid base64")
 }
 
+/// Marks the error of a release key file that exists but cannot be used: a fault of this
+/// machine, unlike a missing key folder or channel.
+#[derive(Debug)]
+pub struct KeyFileFault;
+
+impl std::fmt::Display for KeyFileFault {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "a release key file is damaged")
+    }
+}
+
 /// A release key: raw 32-byte Ed25519 public key.
 type ReleaseKey = UnparsedPublicKey<[u8; 32]>;
 
@@ -123,11 +134,14 @@ fn keys() -> Result<Vec<ReleaseKey>> {
     paths.sort();
     let mut keys = Vec::new();
     for path in &paths {
-        let raw =
-            decode_b64(&fs::read(path)?).with_context(|| format!("key {}", path.display()))?;
-        let array: [u8; 32] = raw
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("key {} is not 32 bytes", path.display()))?;
+        let raw = fs::read(path)
+            .map_err(anyhow::Error::from)
+            .and_then(|bytes| decode_b64(&bytes))
+            .with_context(|| format!("key {}", path.display()))
+            .context(KeyFileFault)?;
+        let array: [u8; 32] = raw.try_into().map_err(|_| {
+            anyhow::anyhow!("key {} is not 32 bytes", path.display()).context(KeyFileFault)
+        })?;
         keys.push(UnparsedPublicKey::new(&ED25519, array));
     }
     ensure!(

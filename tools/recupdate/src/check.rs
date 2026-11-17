@@ -15,7 +15,15 @@ pub fn report() -> Result<Value> {
     let os = crate::release::os_release()?;
     let installed = crate::release::installed()?;
     let channel = crate::release::load_channel()?;
-    let m = &channel.manifest;
+    Ok(build_report(&os, &installed, &channel.manifest))
+}
+
+/// The report of section 10 from the three things a check reads.
+fn build_report(
+    os: &crate::release::OsRelease,
+    installed: &crate::release::Installed,
+    m: &crate::release::Manifest,
+) -> Value {
     let available = if m.serial > installed.serial {
         json!({
             "version": m.version,
@@ -34,14 +42,14 @@ pub fn report() -> Result<Value> {
         Ok(None) => Value::Null,
         Err(_) => json!({ "version": "", "serial": 0 }),
     };
-    Ok(json!({
+    json!({
         "schema": 1,
         "os": os.id,
         "installed": { "version": installed.version, "serial": installed.serial },
         "available": available,
         "interrupted": interrupted,
         "checked_at": crate::util::now_rfc3339(),
-    }))
+    })
 }
 
 pub fn check(json: bool) -> Result<()> {
@@ -75,9 +83,42 @@ pub fn check(json: bool) -> Result<()> {
     Ok(())
 }
 
-/// Run the check and write `available.json`. A failed check leaves the old file.
+/// Run the check and write `available.json`; the background job of the daily timer.
+///
+/// A check that could not be made is a normal outcome for a background job: the machine is
+/// offline, the channel does not exist yet (404), the channel's files do not verify, the
+/// system has no release record or no release key. It prints one line to stderr, leaves the
+/// old `available.json` as it is and exits 0, so the timer's unit does not count as failed.
+/// A fault of this machine still exits 1: unreadable `/etc/os-release`, a release record that
+/// exists but is damaged, a damaged release key file, a state folder that cannot be written.
 pub fn notice() -> Result<()> {
-    let report = report()?;
+    use crate::release::{self, KeyFileFault};
+    let os = release::os_release()?;
+    let installed = match release::installed() {
+        Ok(installed) => installed,
+        Err(error) => {
+            let missing = error
+                .root_cause()
+                .downcast_ref::<std::io::Error>()
+                .is_some_and(|io| io.kind() == std::io::ErrorKind::NotFound);
+            if missing {
+                eprintln!("recupdate: no update check: {error:#}");
+                return Ok(());
+            }
+            return Err(error);
+        }
+    };
+    let channel = match release::load_channel() {
+        Ok(channel) => channel,
+        Err(error) => {
+            if error.downcast_ref::<KeyFileFault>().is_some() {
+                return Err(error);
+            }
+            eprintln!("recupdate: could not check for an update: {error:#}");
+            return Ok(());
+        }
+    };
+    let report = build_report(&os, &installed, &channel.manifest);
     let mut text = serde_json::to_string(&report)?;
     text.push('\n');
     crate::util::write_atomic(&state_dir().join("available.json"), text.as_bytes(), 0o644)
