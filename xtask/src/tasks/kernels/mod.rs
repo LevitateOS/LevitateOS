@@ -1,7 +1,7 @@
-//! `build kernel`: the CLI arm and the kernel build window. distro-builder's
+//! `build kernel`: the CLI arm. distro-builder's
 //! kernel module owns the kernel (its pin, the Recipe run, the bundle check).
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use distro_builder::kernel::{self, KernelStatus, Source};
 
 mod publish;
@@ -52,43 +52,9 @@ pub fn build(args: KernelArgs) -> Result<()> {
             );
             continue;
         }
-        if !args.prebuilt {
-            enforce_build_hours(args.now)?;
-        }
         let release = kernel::install(&variant, &source, args.rebuild)
             .with_context(|| format!("installing the {} kernel", distro.id()))?;
         eprintln!("[ok] {}: {release}", distro.id());
     }
     Ok(())
-}
-
-/// Kernel compiles run 10:00-23:00 so the build's fan noise stays out of the
-/// night; `--now` overrides.
-pub(crate) fn enforce_build_hours(now: bool) -> Result<()> {
-    if now {
-        return Ok(());
-    }
-    let (hour, minute) = local_time()?;
-    if (10..23).contains(&hour) {
-        return Ok(());
-    }
-    Err(crate::util::exit::missing(
-        format!("kernel compiles run between 10:00 and 23:00 (it is {hour:02}:{minute:02})"),
-        "add --now to compile anyway, or use --prebuilt to download it",
-    ))
-}
-
-/// The local hour and minute.
-fn local_time() -> Result<(i32, i32)> {
-    // SAFETY: `time(NULL)` reads the clock; `localtime_r` fills the `tm` it is
-    // given and touches nothing else.
-    let tm = unsafe {
-        let now = libc::time(std::ptr::null_mut());
-        let mut tm: libc::tm = std::mem::zeroed();
-        if libc::localtime_r(&now, &mut tm).is_null() {
-            bail!("reading the local time");
-        }
-        tm
-    };
-    Ok((tm.tm_hour, tm.tm_min))
 }

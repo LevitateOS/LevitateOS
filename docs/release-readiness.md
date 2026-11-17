@@ -304,7 +304,7 @@ it only where it says so.
    `ab-update` and `desktop-boot` pass on both, plus an install from the
    desktop ISO that logs in. Products and scenarios run locally, never in CI;
    get CI's quick checks green (A2, B stage 1). Builds only when the user
-   asks, within the 10:00–01:00 window.
+   asks.
 4. **Real laptops** with the built desktop images (B stage 2), once step 3
    passes. It also produces the download page's hardware statement.
 5. **A week on it:** the step 2 state design built and run; AcornOS's session

@@ -32,7 +32,7 @@ With no state file it says no build is running; a state still marked `running` w
 
 ## Publishing a kernel
 
-`cargo xtask kernel publish <distro> [--upload] [--from <step>] [--now] [--jobs N] [--busybox PATH]` makes the prebuilt bundle that `build kernel --prebuilt` downloads. It runs in the foreground and needs no root. The steps:
+`cargo xtask kernel publish <distro> [--upload] [--from <step>] [--jobs N] [--busybox PATH]` makes the prebuilt bundle that `build kernel --prebuilt` downloads. It runs in the foreground and needs no root. The steps:
 
 1. `fetch`: the pinned kernel.org source, sha256-checked, cached in `.artifacts/kernel/src`.
 2. `config`: defconfig plus the variant's kconfig; fails listing every option that did not stick.
@@ -43,7 +43,7 @@ With no state file it says no build is running; a state still marked `running` w
 
 Without `--upload` it stops after `boot` and prints what upload would do.
 
-Everything is under `.artifacts/kernel/<distro>/<release>/`. `state.json` records each step, so a rerun resumes after the last finished step and `--from <step>` redoes a step and the ones after it. A failure ends with `[fail] <step>: <reason> (log: <path>)` and a nonzero exit. Kernel compiles are allowed 10:00-23:00 (`--now` overrides). After an upload, update the AcornOS digest hard-coded in `tools/recipe/tests/e2e/kernel_acquisition.rs` and commit the `linux-prebuilt.rhai` change.
+Everything is under `.artifacts/kernel/<distro>/<release>/`. `state.json` records each step, so a rerun resumes after the last finished step and `--from <step>` redoes a step and the ones after it. A failure ends with `[fail] <step>: <reason> (log: <path>)` and a nonzero exit. After an upload, update the AcornOS digest hard-coded in `tools/recipe/tests/e2e/kernel_acquisition.rs` and commit the `linux-prebuilt.rhai` change.
 
 ## Other commands
 

@@ -490,7 +490,6 @@ fn config(ctx: &Ctx) -> Result<()> {
 }
 
 fn build(ctx: &Ctx) -> Result<()> {
-    super::enforce_build_hours(ctx.args.now)?;
     let jobs = ctx
         .args
         .jobs

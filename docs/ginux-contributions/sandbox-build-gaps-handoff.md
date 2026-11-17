@@ -165,8 +165,7 @@ probe runs again from the start; an unchanged one is skipped as installed
   them.
 - Running a recipe means running Recipe as root. A recipe that downloads code
   needs the user's yes for that source; the probe downloads nothing.
-- Kernel, ISO and VM builds only between 10:00 and 01:00. A Ginux build and a
-  probe run are small.
+- A Ginux build and a probe run are small.
 
 ## Not part of this job
 

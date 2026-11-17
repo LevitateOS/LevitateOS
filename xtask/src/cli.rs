@@ -547,9 +547,6 @@ pub struct PublishArgs {
     /// Redo this step and every step after it.
     #[arg(long, value_name = "STEP", value_parser = ["fetch", "config", "build", "package", "boot", "upload"])]
     pub from: Option<String>,
-    /// Compile even outside the 10:00-23:00 kernel build window.
-    #[arg(long)]
-    pub now: bool,
     /// make -j (default: half the CPUs).
     #[arg(long, value_name = "N", value_parser = clap::value_parser!(usize))]
     pub jobs: Option<usize>,
@@ -568,9 +565,6 @@ pub struct KernelArgs {
     /// Build (or download) again even if verified artifacts are present.
     #[arg(long)]
     pub rebuild: bool,
-    /// Compile even outside the 10:00-23:00 kernel build window.
-    #[arg(long, conflicts_with = "prebuilt")]
-    pub now: bool,
 }
 
 #[derive(Args)]
