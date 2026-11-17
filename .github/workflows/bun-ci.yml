@@ -51,12 +51,12 @@ jobs:
       PACKAGE_DIR: ${{ inputs.workspace-path || inputs.working-directory }}
       INSTALL_DIR: ${{ inputs.workspace-path && '.' || inputs.working-directory }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: inputs.workspace-path == ''
 
       - name: Check out the superproject
         if: inputs.workspace-path != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: LevitateOS/LevitateOS
 
@@ -81,7 +81,7 @@ jobs:
 
       - name: Check out the caller at its workspace path
         if: inputs.workspace-path != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: ${{ inputs.workspace-path }}
 
@@ -123,7 +123,7 @@ jobs:
 
       - name: Upload build artifact
         if: inputs.upload-dist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist
           path: ${{ env.PACKAGE_DIR }}/dist/
