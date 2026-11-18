@@ -23,6 +23,8 @@ Verification 2026-11-18 (pushed `05e8e754`): `build release` of both distros, `d
 
 Release folders ready (unsigned, nothing uploaded): `.artifacts/out/levitate/releases/release/A1dxUUdTNMkuVDDA/` and `.artifacts/out/acorn/releases/release/A1e8E8G9C6alXhDL/`, each with the ISO, its `.sha512`, `base`/`boot`/`recipes` archives, five `parts-*.tar.zst`, `SOURCES.txt` and `release.json` (version 1.0, serial 1). The website's release notes are in `docs/website/src/releases/`.
 
+Published 2026-11-18 (owner's yes): LevitateOS 1.0 and AcornOS 1.0 (serial 1) are releases `levitateos-1` and `acornos-1` in LevitateOS/releases, with the signed channel files `channels/<os>/stable.json` (+ `.sig`); both signatures verify against `distro/keys/release/2026-11.pub`. Runbook steps 2 is done; 3 to 5 are open and each needs its own yes.
+
 Publish runbook (owner, in this order; each step needs the owner's yes):
 1. Back up `~/.config/levitate/release.key` offline; enable private vulnerability reporting on LevitateOS/LevitateOS.
 2. `cargo xtask release publish levitate --dir .artifacts/out/levitate/releases/release/A1dxUUdTNMkuVDDA` and the same for `acorn --dir .artifacts/out/acorn/releases/release/A1e8E8G9C6alXhDL` (fills and signs `release.json`, uploads every asset to GitHub release `<os>-1` in LevitateOS/releases, writes `channels/<os>/stable.json`).
