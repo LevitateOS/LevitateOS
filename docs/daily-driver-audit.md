@@ -230,7 +230,7 @@ Usable without them, but a person would notice within a week.
   decoding and no GStreamer plug-ins, and must be re-pinned when a release
   changes FFmpeg). AcornOS ships Alpine's full codecs and does
   not have this problem.
-- Fedora's branding is still in the lock (`fedora-logos`,
+- (Dropped from the lock 2026-11-18, `desktop.exclude`; unbuilt.) Fedora's branding was in the lock (`fedora-logos`,
   `plasma-lookandfeel-fedora`, `kde-settings*`, `f45-backgrounds-*`), and the
   dark look, wallpaper and start-button steps patch Fedora's files. It has to
   go before anything is published under the LevitateOS name.
