@@ -159,8 +159,11 @@ In source, unbuilt:
   base. The desktop, Firefox, audio, network, printing and the rest are group
   recipes ([`recipes/`](recipes/)) with their own configuration, and the
   installer installs each OS's default set (`[desktop].recipes` in
-  `distro.toml`) from a package cache on the install medium. Each group has a
-  receipt and can be removed.
+  `distro.toml`) from the release's category parts, which recsetup downloads
+  into Recipe's package cache during the installation (the ISO carries the
+  recipes and the list, not the packages;
+  [`docs/release-engineering.md`](docs/release-engineering.md), section 11).
+  Each group has a receipt and can be removed.
 - Recipe writes "for everyone" installs into the other root on an A/B
   installation and into the one root on a mutable one.
 - Releases and updates, as designed in
