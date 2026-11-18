@@ -3,13 +3,15 @@
 //! Design: docs/release-engineering.md (sections 2 to 4 and 10). The build writes an unsigned
 //! `release.json` next to the ISO; `publish` fills the download facts, signs, uploads the files
 //! to a GitHub release `<os>-<serial>` in `LevitateOS/releases` (resumable: assets already
-//! uploaded with the same size are skipped) and moves the channel pointer last.
+//! uploaded with the same size are skipped) and moves the channel pointer last. The release's
+//! category parts (`parts-<category>.tar.zst`, section 11) are assets of the same release, listed
+//! in the manifest's `parts`. `site` records a prepared release in the website's data file.
 use anyhow::{Context, Result, bail, ensure};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use ed25519_dalek::{Signer, SigningKey};
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
+use sha2::{Digest, Sha256, Sha512};
 use std::fs;
 use std::io::Read;
 use std::os::unix::fs::OpenOptionsExt;
@@ -18,6 +20,10 @@ use std::process::Command;
 
 const REPO: &str = "LevitateOS/releases";
 const KEY_ENV: &str = "LEVITATE_RELEASE_KEY";
+/// GitHub release assets stop at 2 GiB: nothing larger is uploaded.
+const MAX_ASSET_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+/// The website's data file of the released ISOs (`docs/website/src/data/releases.json`).
+const SITE_DATA: &str = "docs/website/src/data/releases.json";
 /// The archives the build writes next to the ISO, and the manifest field of each.
 const ARCHIVES: [(&str, &str); 3] = [
     ("base", "base.tar.zst"),
@@ -29,19 +35,27 @@ pub const USAGE: &str = "usage:
   cargo xtask release keygen --out FILE
   cargo xtask release sign RELEASE.JSON [--key FILE]
   cargo xtask release publish DISTRO [--key FILE] [--dir DIR]
+  cargo xtask release site DISTRO [--iso-url URL] [--dir DIR]
 
 keygen writes the private seed (base64, mode 0600) and prints the public key line for
 /usr/share/levitate/release-keys/. The key path comes from --key or LEVITATE_RELEASE_KEY.
-publish reads the unsigned release.json and base.tar.zst, boot.tar.zst, recipes.tar.zst and the
-.iso next to it (--dir, default: the newest .artifacts/out/<distro>/releases/release/* folder with
-a release.json), fills url, sha256 and size, signs, uploads to LevitateOS/releases as release
-<os>-<serial> and last commits channels/<os>/stable.json (+ .sig). A rerun resumes.";
+publish reads the unsigned release.json and base.tar.zst, boot.tar.zst, recipes.tar.zst, every
+parts-<category>.tar.zst the manifest's `parts` names, and the .iso next to it (--dir, default:
+the newest .artifacts/out/<distro>/releases/release/* folder with a release.json), fills url,
+sha256 and size, signs, uploads to LevitateOS/releases as release <os>-<serial> and last commits
+channels/<os>/stable.json (+ .sig). A rerun resumes (assets already uploaded with the same size
+are skipped). No file over 2 GiB is uploaded: the check runs before anything is hashed or sent.
+site merges this release into the website's docs/website/src/data/releases.json (created when
+absent): version, serial, date and notes from release.json, the ISO's SHA-512 and size, and each
+part's name and size, from the same folder as publish. The ISO's download address is --iso-url,
+default the asset of the GitHub release <os>-<serial> in LevitateOS/releases.";
 
 pub fn run(args: &[String]) -> Result<()> {
     match args.first().map(String::as_str) {
         Some("keygen") => keygen(&args[1..]),
         Some("sign") => sign(&args[1..]),
         Some("publish") => publish(&args[1..]),
+        Some("site") => site(&args[1..]),
         _ => bail!("{USAGE}"),
     }
 }
@@ -221,6 +235,103 @@ fn publish(args: &[String]) -> Result<()> {
     Ok(())
 }
 
+// ---------------------------------------------------------------- site
+
+fn sha512_file(path: &Path) -> Result<String> {
+    let mut file = fs::File::open(path).with_context(|| format!("opening {}", path.display()))?;
+    let mut hasher = Sha512::new();
+    let mut buf = vec![0u8; 1 << 20];
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(hasher.finalize().iter().map(|b| format!("{b:02x}")).collect())
+}
+
+/// Merge this release's entry into the website's `releases.json` (`levitateos` and `acornos`,
+/// each null until released), keeping everything else in the file.
+fn site(args: &[String]) -> Result<()> {
+    let (positional, options) = parse(args, &["--iso-url", "--dir"])?;
+    ensure!(positional.len() == 1, "{USAGE}");
+    let distro = &positional[0];
+    let root = crate::util::repo::repo_root()?;
+    let dir = match option(&options, "--dir") {
+        Some(d) => PathBuf::from(d),
+        None => newest_release_dir(&root, distro)?,
+    };
+    let path = dir.join("release.json");
+    let manifest: Value = serde_json::from_str(
+        &fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?,
+    )
+    .with_context(|| format!("{} is not JSON", path.display()))?;
+    let os = manifest["os"].as_str().context("release.json has no os")?;
+    ensure!(
+        matches!(os, "levitateos" | "acornos"),
+        "release.json names the system {os:?}; the website lists levitateos and acornos"
+    );
+    let serial = manifest["serial"].as_u64().context("release.json has no serial")?;
+    let field = |name: &str| -> Result<String> {
+        manifest[name]
+            .as_str()
+            .filter(|v| !v.is_empty())
+            .map(str::to_owned)
+            .with_context(|| format!("release.json has no {name}"))
+    };
+    let mut iso = None;
+    for entry in fs::read_dir(&dir)?.flatten() {
+        if entry.path().extension().is_some_and(|e| e == "iso") {
+            ensure!(iso.is_none(), "more than one .iso in {}", dir.display());
+            iso = Some(entry.path());
+        }
+    }
+    let iso = iso.with_context(|| format!("no .iso in {}", dir.display()))?;
+    let iso_name = iso.file_name().unwrap().to_string_lossy().into_owned();
+    let iso_url = match option(&options, "--iso-url") {
+        Some(url) => url.to_owned(),
+        None => format!("https://github.com/{REPO}/releases/download/{os}-{serial}/{iso_name}"),
+    };
+    ensure!(iso_url.starts_with("https://"), "--iso-url must be an https:// address, got {iso_url}");
+    eprintln!("[info] hashing {iso_name}");
+    let mut parts = Vec::new();
+    for part in manifest["parts"].as_array().context("release.json has no `parts` list; build the release again")? {
+        let name = part["name"].as_str().context("a part has no name")?;
+        let file = dir.join(format!("{name}.tar.zst"));
+        let size = fs::metadata(&file).with_context(|| format!("reading {}", file.display()))?.len();
+        parts.push(json!({ "name": name, "size": size }));
+    }
+    let entry = json!({
+        "version": field("version")?,
+        "serial": serial,
+        "date": field("date")?,
+        "iso": { "url": iso_url, "sha512": sha512_file(&iso)?, "size": fs::metadata(&iso)?.len() },
+        "notes": field("notes")?,
+        "parts": parts,
+    });
+
+    let data = root.join(SITE_DATA);
+    let mut all: Value = match fs::read_to_string(&data) {
+        Ok(text) => serde_json::from_str(&text).with_context(|| format!("{} is not JSON", data.display()))?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => json!({}),
+        Err(error) => return Err(error).with_context(|| format!("reading {}", data.display())),
+    };
+    let object = all.as_object_mut().with_context(|| format!("{} is not a JSON object", data.display()))?;
+    for key in ["levitateos", "acornos"] {
+        object.entry(key).or_insert(Value::Null);
+    }
+    object.insert(os.to_owned(), entry);
+    if let Some(folder) = data.parent() {
+        fs::create_dir_all(folder).with_context(|| format!("creating {}", folder.display()))?;
+    }
+    let mut text = serde_json::to_string_pretty(&all)?;
+    text.push('\n');
+    fs::write(&data, text).with_context(|| format!("writing {}", data.display()))?;
+    println!("recorded {os} {} (serial {serial}) in {}", field("version")?, data.display());
+    Ok(())
+}
+
 /// The newest folder under `.artifacts/out/<distro>/releases/release/` holding a release.json.
 fn newest_release_dir(root: &Path, distro: &str) -> Result<PathBuf> {
     let base = root
@@ -265,7 +376,7 @@ fn sha256_file(path: &Path) -> Result<String> {
         .collect())
 }
 
-/// Read the unsigned manifest and fill url, sha256 and size for base, boot, recipes and iso.
+/// Read the unsigned manifest and fill url, sha256 and size for base, boot, recipes, iso and every part.
 /// Returns the context, the filled manifest and the data files to upload.
 fn fill_manifest(dir: &Path) -> Result<(Ctx, Value, Vec<PathBuf>)> {
     let path = dir.join("release.json");
@@ -299,14 +410,62 @@ fn fill_manifest(dir: &Path) -> Result<(Ctx, Value, Vec<PathBuf>)> {
         }
     }
     let iso = iso.with_context(|| format!("no .iso in {}", dir.display()))?;
-    let mut parts: Vec<(&str, PathBuf)> = ARCHIVES
+    let mut members: Vec<(String, Option<usize>, PathBuf)> = ARCHIVES
         .iter()
-        .map(|(field, name)| (*field, dir.join(name)))
+        .map(|(field, name)| (field.to_string(), None, dir.join(name)))
         .collect();
-    parts.push(("iso", iso));
+    members.push(("iso".into(), None, iso));
+    // The category parts: exactly the files the manifest names.
+    let parts = manifest["parts"].as_array().with_context(|| {
+        format!(
+            "{} has no `parts` list: it was written before category parts; build the release again",
+            path.display()
+        )
+    })?;
+    let mut part_files = Vec::new();
+    for (index, part) in parts.iter().enumerate() {
+        let name = part["name"]
+            .as_str()
+            .filter(|n| n.starts_with("parts-") && !n.contains(['/', '.']))
+            .with_context(|| format!("release.json: parts[{index}] has no name of the form parts-<category>"))?;
+        ensure!(
+            part["category"].as_str().is_some_and(|c| !c.is_empty() && name == format!("parts-{c}")),
+            "release.json: parts[{index}] {name} does not match its category"
+        );
+        let file = dir.join(format!("{name}.tar.zst"));
+        ensure!(
+            file.is_file(),
+            "{} is missing; the release build writes one parts-<category>.tar.zst per category next to release.json",
+            file.display()
+        );
+        part_files.push(file.clone());
+        members.push(("parts".into(), Some(index), file));
+    }
+    for entry in fs::read_dir(dir)?.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name.starts_with("parts-") && name.ends_with(".tar.zst") && !part_files.contains(&entry.path()) {
+            bail!(
+                "{} is in {} but release.json lists no such part; remove it, or build the release again",
+                name,
+                dir.display()
+            );
+        }
+    }
+    // Nothing over the asset limit goes anywhere: checked before hashing or uploading a byte.
+    for (_, _, file) in &members {
+        let size = fs::metadata(file).with_context(|| format!("reading {}", file.display()))?.len();
+        ensure!(
+            size <= MAX_ASSET_BYTES,
+            "{} is {:.2} GiB; a GitHub release asset may have at most 2 GiB. Split its category in \
+             [[desktop.categories]] of the variant's distro.toml (parts) or remove what grew the file, \
+             and build the release again",
+            file.display(),
+            size as f64 / 1073741824.0
+        );
+    }
 
     let mut files = Vec::new();
-    for (field, file) in parts {
+    for (field, index, file) in members {
         let name = file.file_name().unwrap().to_string_lossy().into_owned();
         ensure!(
             file.is_file(),
@@ -314,11 +473,14 @@ fn fill_manifest(dir: &Path) -> Result<(Ctx, Value, Vec<PathBuf>)> {
             file.display()
         );
         eprintln!("[info] hashing {name}");
-        let entry = manifest
-            .as_object_mut()
-            .unwrap()
-            .entry(field)
-            .or_insert_with(|| json!({}));
+        let entry = match index {
+            Some(index) => &mut manifest["parts"][index],
+            None => manifest
+                .as_object_mut()
+                .unwrap()
+                .entry(field.clone())
+                .or_insert_with(|| json!({})),
+        };
         ensure!(
             entry.is_object() || entry.is_null(),
             "release.json: {field} is not an object"

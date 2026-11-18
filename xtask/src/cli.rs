@@ -181,7 +181,8 @@ pub struct Cli {
 pub enum Cmd {
     /// `release recipe` builds the standalone Recipe release (see `release recipe --help`);
     /// `release keygen|sign|publish` sign and publish the system release that
-    /// `build release <distro>` wrote next to its ISO (see `release --help`).
+    /// `build release <distro>` wrote next to its ISO, `release site` records it in the
+    /// website's data file (see `release --help`).
     #[command(disable_help_flag = true)]
     Release {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]

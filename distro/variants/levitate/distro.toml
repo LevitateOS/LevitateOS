@@ -4,7 +4,7 @@
 # `distro_contract::registry`, the same for every variant, and every artifact
 # name (`<os_id>-x86_64-<product>.iso`, `<os_id>-live.efi`, ...) follows from
 # `os_id`.
-schema_version = 12
+schema_version = 13
 
 [identity]
 os_name = "LevitateOS"
@@ -195,9 +195,9 @@ packages = [
 
 # The default software set (docs/product-handoff.md 2.4): group recipes of
 # the public catalogue (recipes/), installed through Recipe into every target
-# during the installation, from the release medium, which carries these
-# recipes and every package they pin. The system image is the base above;
-# nothing here is burned into it. `cargo xtask base lock levitate` locks what
+# during the installation. The release medium carries these recipes; the
+# packages they pin come as downloadable parts (the categories below). The
+# system image is the base above; nothing here is burned into it. `cargo xtask base lock levitate` locks what
 # the group recipes' seeds need beyond the base (the desktop lock), which the
 # preseed downloads; `cargo xtask base groups levitate` writes each recipe's
 # share of it as its pins.
@@ -224,3 +224,31 @@ apps_build_packages = [
 ]
 apps_build_preseed_recipe_script = "distro/builder/os-recipes/fedora-rpm-apps-build-preseed.rhai"
 apps_build_root_recipe_script = "distro/builder/os-recipes/fedora-rpm-apps-build-root.rhai"
+
+# The default set cut into categories, one downloadable part each
+# (docs/release-engineering.md, section 11; `parts-<name>.tar.zst`). Every recipe
+# above is in exactly one category. A package file goes into the part of the
+# first category (in this order) whose recipes and their deps need it, so the
+# parts do not overlap; each part stays under 1.5 GiB.
+[[desktop.categories]]
+name = "desktop"
+recipes = [
+  "plasma", "login-screen", "konsole", "dolphin", "kwrite", "ark", "spectacle",
+  "plasma-systemmonitor", "kcalc", "skanlite", "drkonqi", "print-manager",
+  "thumbnailers", "manuals",
+]
+[[desktop.categories]]
+name = "browser"
+recipes = ["firefox"]
+[[desktop.categories]]
+name = "system"
+recipes = [
+  "audio", "network", "network-ui", "bluetooth", "printing", "firewall",
+  "graphics-drivers", "filesystems", "thunderbolt", "vm-guest",
+]
+[[desktop.categories]]
+name = "fonts"
+recipes = ["fonts", "fonts-office", "fonts-cjk", "spelling", "screen-reader"]
+[[desktop.categories]]
+name = "apps"
+recipes = ["rec-apps"]
