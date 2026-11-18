@@ -22,6 +22,8 @@ const REPO: &str = "LevitateOS/releases";
 const KEY_ENV: &str = "LEVITATE_RELEASE_KEY";
 /// GitHub release assets stop at 2 GiB: nothing larger is uploaded.
 const MAX_ASSET_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+/// The source list next to the ISO (`distro_builder`'s `source_offer`), and the manifest field of it.
+const SOURCES: &str = "SOURCES.txt";
 /// The website's data file of the released ISOs (`docs/website/src/data/releases.json`).
 const SITE_DATA: &str = "docs/website/src/data/releases.json";
 /// The archives the build writes next to the ISO, and the manifest field of each.
@@ -40,7 +42,8 @@ pub const USAGE: &str = "usage:
 keygen writes the private seed (base64, mode 0600) and prints the public key line for
 /usr/share/levitate/release-keys/. The key path comes from --key or LEVITATE_RELEASE_KEY.
 publish reads the unsigned release.json and base.tar.zst, boot.tar.zst, recipes.tar.zst, every
-parts-<category>.tar.zst the manifest's `parts` names, and the .iso next to it (--dir, default:
+parts-<category>.tar.zst the manifest's `parts` names, SOURCES.txt (the source list; an asset of the
+release, recorded in the manifest's `sources`, when the build wrote it) and the .iso next to it (--dir, default:
 the newest .artifacts/out/<distro>/releases/release/* folder with a release.json), fills url,
 sha256 and size, signs, uploads to LevitateOS/releases as release <os>-<serial> and last commits
 channels/<os>/stable.json (+ .sig). A rerun resumes (assets already uploaded with the same size
@@ -376,7 +379,7 @@ fn sha256_file(path: &Path) -> Result<String> {
         .collect())
 }
 
-/// Read the unsigned manifest and fill url, sha256 and size for base, boot, recipes, iso and every part.
+/// Read the unsigned manifest and fill url, sha256 and size for base, boot, recipes, iso, sources and every part.
 /// Returns the context, the filled manifest and the data files to upload.
 fn fill_manifest(dir: &Path) -> Result<(Ctx, Value, Vec<PathBuf>)> {
     let path = dir.join("release.json");
@@ -415,6 +418,15 @@ fn fill_manifest(dir: &Path) -> Result<(Ctx, Value, Vec<PathBuf>)> {
         .map(|(field, name)| (field.to_string(), None, dir.join(name)))
         .collect();
     members.push(("iso".into(), None, iso));
+    // The source list (the written offer and every source package, written by the release build)
+    // is an asset of the release when the build wrote it; a manifest of a build without one has no
+    // `sources` entry.
+    let sources = dir.join(SOURCES);
+    if sources.is_file() {
+        members.push(("sources".into(), None, sources));
+    } else if let Some(object) = manifest.as_object_mut() {
+        object.remove("sources");
+    }
     // The category parts: exactly the files the manifest names.
     let parts = manifest["parts"].as_array().with_context(|| {
         format!(
