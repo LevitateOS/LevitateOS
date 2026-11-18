@@ -310,3 +310,14 @@ package cache is cut by **category** instead and taken out of the ISO.
   starting it, no AI is involved, and a changed part changes only the hash in
   the manifest. `recupdate apply` and `recab update` are not changed: they take
   recipes from `recipes.tar.zst` and files from the same cache mechanism.
+
+## 12. Source offer: SOURCES.txt and the written offer
+
+`build release <distro>` writes `SOURCES.txt` next to the ISO and `release publish` uploads it as an asset of the same
+release. Its header is the written offer: for three years, on request to the issue tracker, the corresponding source of
+every GPL and LGPL program, at the cost of distribution; below it, sorted, one line per source package (version,
+licence, URL, SHA-256, binary packages). `unknown` stands where a fact is in no pin and no package header (today the
+SHA-256 of Fedora's source RPMs and Alpine's origins), never for a guess. Mirroring the listed source next to each
+release comes before promoting a release to stable. The image carries the offer as
+`/usr/share/doc/levitate/LICENSES.txt`, and AcornOS's licence texts under `/usr/share/licenses/<SPDX-id>/` with the
+identifiers that have no text in `/usr/share/licenses/MISSING.txt` (add `LICENSES/<SPDX-id>.txt` to close one).
