@@ -44,7 +44,11 @@ and file that sets it, then lists what LevitateOS and AcornOS ship in its place.
 
 The desktop closure pulls in Fedora's art and look. Recipes unpack the locked
 RPMs without a solver, so the lock simply leaves these packages out and our
-branding ships files in their place:
+branding ships files in their place. Done 2026-11-18: `desktop.exclude` in
+`distro.toml` lists them (below, except `fedora-release*`, which the base never
+pulls: `system-release` is `provided_elsewhere`), the lock generation resolves
+without them, and the plasma recipe uses KDE's Breeze Global Theme until an own
+theme exists:
 
 | Package | Pulled in by | What it sets |
 |---|---|---|
@@ -56,16 +60,24 @@ branding ships files in their place:
 | (sddm-breeze file) `usr/share/sddm/themes/01-breeze-fedora` | `sddm-breeze` | login screen with Fedora logo and F45 background |
 | (firefox file) `firefox-redhat-default-prefs.js` | `firefox` | homepage and pinned tab `start.fedoraproject.org` |
 
-Fedora offers `generic-logos` and `generic-release` for remixes (both in the F45
-repository). The lock request names `generic-logos` so `system-logos` resolves
-without Fedora's art. The Fedora packages above, which only hold art, are left
-out of the lock. Lock generation therefore needs an exclude list beside the
-request: `cargo xtask base lock levitate` passes it to dnf (`--exclude`), and
-the recipe drops the two Fedora files that live inside packages we keep
-(`01-breeze-fedora`, the Firefox prefs file).
+Fedora offers `generic-logos` and `generic-release` for remixes, but
+`generic-logos` still names its files `fedora-logo-icon`, `start-here` and the
+like, so it is not used: `system-logos` (which `breeze-icon-theme` asks for) is
+`provided_elsewhere`, met by the image's own mark. The Fedora packages above
+are excluded: `cargo xtask base lock` and `base groups` read the exclude list
+(`desktop.exclude`) from the contract, leave those packages out of the index and
+take a requirement on one of their names (`plasma-workspace` asks for
+`plasma-lookandfeel-fedora` and `kde-settings-plasma`) as met. The recipe drops
+the Fedora file that lives inside a package we keep (the Firefox prefs file).
 
-`kde-settings` also carries non-branding environment scripts (ssh-agent,
-GTK scrolling). None of them is required. Leave it out.
+`kde-settings` also carried configuration that the plasma recipe now writes
+itself: the menu's favourites (Kickoff's `favorites`, in the default panel
+template, with Recipe in Discover's place), `ksmserverrc` (an empty session at
+login), `baloofilerc` (no indexing of the home folder) and a polkit rule for the
+clock. It required `xdg-user-dirs`, now a seed of the plasma recipe. Its
+environment scripts (ssh-agent, GTK scrolling, XDG paths), the double-click
+default, the font names, the Fedora wallpapers and the on-screen keyboard
+setting are not carried over.
 
 ### What LevitateOS ships
 
@@ -75,10 +87,10 @@ recipe), owned by root, mode 0644:
 | Item | Path | Content |
 |---|---|---|
 | Global Theme | `/usr/share/plasma/look-and-feel/org.levitateos.desktop/` | `metadata.json`; `contents/defaults` (colour scheme, icons `breeze`, cursor `breeze_cursors`, Plasma style `default`, window decoration Breeze, `[Wallpaper] Image=LevitateOS`, `[ksplashrc] Theme=org.levitateos.desktop`); `contents/layouts/org.kde.plasma.desktop-layout.js` (bottom panel, Kickoff with `icon=distributor-logo-levitateos`); `contents/splash/Splash.qml` (Breeze splash with our mark); `contents/previews/*` |
-| Default theme (done, unbuilt) | `/etc/xdg/kdeglobals` | today: `[KDE] LookAndFeelPackage=org.fedoraproject.fedoralight.desktop` (`fedoradark` when the mode is dark), `[General] ColorScheme=LevitateOSLight`, `accentColorFromWallpaper=false`, `[Icons] Theme=breeze` (`breeze-dark` on dark), and the scheme's colour groups. Fedora's `fedora`, `fedoralight` and `fedoradark` Global Themes name `LevitateOSLight`/`LevitateOSDark` in their `contents/defaults` in place of Breeze's, because Plasma copies the Global Theme's defaults into each user's `~/.config/kdedefaults`, which is read ahead of `/etc/xdg`. Later: `org.levitateos.desktop`, Noto fonts |
+| Default theme (done, unbuilt) | `/etc/xdg/kdeglobals` | today: `[KDE] LookAndFeelPackage=org.kde.breeze.desktop` (`org.kde.breezedark.desktop` when the mode is dark), `[General] ColorScheme=LevitateOSLight`, `accentColorFromWallpaper=false`, `[Icons] Theme=breeze` (`breeze-dark` on dark), and the scheme's colour groups. Breeze's `org.kde.breeze`, `breezedark` and `breezetwilight` Global Themes name `LevitateOSLight`/`LevitateOSDark` (their colour scheme) and `Image=LevitateOS` (their wallpaper, Breeze's `Next`) in their `contents/defaults`, because Plasma copies the Global Theme's defaults into each user's `~/.config/kdedefaults`, which is read ahead of `/etc/xdg`. Later: `org.levitateos.desktop`, Noto fonts |
 | Colour schemes (done, unbuilt) | `/usr/share/color-schemes/LevitateOSLight.colors`, `LevitateOSDark.colors` | generated from the two palettes, with every group of Breeze's schemes: window = surface, view and button and tooltip = raised surface, alternate rows = sunken surface, text = text, inactive text = muted text, selection = accent with surface text, focus, hover and links = accent, visited = highlight, positive/neutral/negative = ok/warn/bad, header, complementary and active title bar = band with on_band text (pine `#214438` on both modes), inactive header and title bar = sunken surface; effects as Breeze's. The scheme carries the brand accent itself; no `AccentColor` is set |
 | Konsole (done, unbuilt) | `/usr/share/konsole/LevitateOSLight.colorscheme`, `LevitateOSDark.colorscheme`, `LevitateOS.profile`, `/etc/xdg/konsolerc` (`[Desktop Entry] DefaultProfile=LevitateOS.profile`) | surface background, text foreground; ANSI black = text on light (on dark, the muted text dimmed towards the surface), bright black = muted text, white = secondary text, bright white = text, red/green/yellow = bad/ok/warn, and blue, magenta, cyan fixed per mode for both distros (`terminal_hues`: light `#2A5C8A`, `#7A3F6E`, `#1F6F6B`; dark `#9BB8D9`, `#D4A5C9`, `#9ACFC4`), since the palette's accent and highlight are too close to green and yellow; bright leans to the text, faint to the surface. Every normal and bright colour is at least 3:1 on the background in all four distro and mode combinations (lowest: bright black on AcornOS light, 3.45:1). The profile uses the dark scheme on both distros, whatever mode the desktop starts in: a terminal is dark (owner, 2026-11-13). The light scheme is installed for those who pick it |
-| Wallpaper (done, unbuilt) | `/usr/share/wallpapers/LevitateOS/` | `metadata.json` (`Id: LevitateOS`), `contents/images/3840x2160.jpg` and `contents/images_dark/3840x2160.jpg`; Plasma scales the one size and shows the dark one under a dark colour scheme, the light one under a light one, so LevitateOS starts on the light one. `/usr/share/wallpapers/Default` links to `LevitateOS`, so Fedora's Global Theme (`Image=Fedora` → `Default`) already shows it; the Fedora background packages are still in the lock |
+| Wallpaper (done, unbuilt) | `/usr/share/wallpapers/LevitateOS/` | `metadata.json` (`Id: LevitateOS`), `contents/images/3840x2160.jpg` and `contents/images_dark/3840x2160.jpg`; Plasma scales the one size and shows the dark one under a dark colour scheme, the light one under a light one, so LevitateOS starts on the light one. `/usr/share/wallpapers/Default` links to `LevitateOS`; Breeze's Global Themes name it; the Fedora background packages are no longer in the lock |
 | Login screen (background done, unbuilt) | `/etc/sddm.conf.d/10-theme.conf` (`[Theme] Current=breeze`) + `/usr/share/sddm/themes/breeze/theme.conf.user` | KDE's Breeze theme (no logo) in place of `01-breeze-fedora`, with `background=` the starting mode's wallpaper (light on LevitateOS) and `color=` that mode's surface; SDDM reads `theme.conf.user` over `theme.conf`. The greeter draws in the scheme of `/etc/xdg/kdeglobals` (its complementary group, the band). Still to do: an own `levitateos` theme with `showlogo=shown` and `logo=` the lockup in the tone of the mode |
 | Lock screen | — | follows the wallpaper; nothing extra |
 | Icons | `/usr/share/icons/hicolor/scalable/apps/distributor-logo-levitateos.svg`, `levitateos-logo-icon.svg`, `…/16x16/apps/…` (micro mark) | see "Icons" |
@@ -133,8 +145,8 @@ Done (unbuilt): `start_button()` in `installed-system.rhai` installs
 micro mark in `hicolor/16x16/apps/`) from `branding/logo-*.svg`, and puts it on
 the start button. The panel follows the starting mode, so the mark is ink in
 light mode (LevitateOS) and paper in dark mode (AcornOS), on either desktop.
-On Plasma, Fedora's look-and-feel scripts that set a new launcher's icon to
-`start-here` set ours instead; on LXQt, `ownIcon` and `icon` in the
+On Plasma, the plasma recipe writes it into the default panel template as the
+launcher's `icon` (Fedora's look-and-feel scripts that used to set it are gone); on LXQt, `ownIcon` and `icon` in the
 `[fancymenu]` section of `/etc/xdg/lxqt/panel.conf`. A user who switches mode
 keeps the starting mode's mark until the symbolic icon exists. `<distro>-logo-icon`, `LOGO=` and the install launcher are not done.
 

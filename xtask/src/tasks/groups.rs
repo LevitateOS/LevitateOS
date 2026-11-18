@@ -156,7 +156,7 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
     let files = cached_files(&cache, &rows)?;
     let (universe, meta, locked_rpms) = match backend {
         PackageBackend::Rpm => {
-            let (u, m, r) = rpm_universe(&rows, &files, &base_contract.provided_elsewhere)?;
+            let (u, m, r) = rpm_universe(&rows, &files, &base::assumed_capabilities(&bundle.contract))?;
             (u, m, r)
         }
         PackageBackend::Apk => {
@@ -568,7 +568,7 @@ pub fn groups(distro: &Distro, check: bool) -> Result<()> {
             &base_set,
             &assigned,
             &locked_rpms,
-            &base_contract.provided_elsewhere,
+            &base::assumed_capabilities(&bundle.contract),
             &mut problems,
         )?;
         for (name, extra) in &found.locked {

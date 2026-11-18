@@ -82,8 +82,10 @@ preseed_recipe_script = "distro/builder/os-recipes/fedora-rpm-preseed.rhai"
 release = "45"
 signing_key = "keys/RPM-GPG-KEY-fedora-45-primary"
 # The image writes its own os-release; `setup` asks for a `system-release`
-# package, which would pull fedora-release and its repo files.
-provided_elsewhere = ["system-release"]
+# package, which would pull fedora-release and its repo files. Breeze's icons
+# ask for `system-logos` (Fedora's logos); the image's own mark is installed
+# as distributor-logo-levitateos (installed-system.rhai, branding).
+provided_elsewhere = ["system-release", "system-logos"]
 packages = [
   # Root filesystem skeleton and core runtime.
   "filesystem",
@@ -208,6 +210,15 @@ recipes = [
   "audio", "network", "network-ui", "bluetooth", "printing", "firewall", "fonts",
   "fonts-office", "fonts-cjk", "spelling", "screen-reader", "thumbnailers",
   "graphics-drivers", "filesystems", "thunderbolt", "manuals", "vm-guest", "rec-apps",
+]
+# Fedora's art and look are not LevitateOS's: no lock takes them. Breeze (KDE's
+# own Global Theme, in plasma-workspace) is the look until an own theme exists;
+# the wallpapers and marks are the variant's (branding/). What kde-settings and
+# kde-settings-plasma configured that the desktop needs is written by the plasma
+# recipe (recipes/plasma.rhai).
+exclude = [
+  "fedora-logos", "plasma-lookandfeel-fedora", "kde-settings", "kde-settings-plasma",
+  "desktop-backgrounds-kde", "f45-backgrounds-base", "f45-backgrounds-kde",
 ]
 preseed_recipe_script = "distro/builder/os-recipes/fedora-rpm-desktop-preseed.rhai"
 # What compiling the desktop apps (tools/gui/) needs: the C++ compiler, CMake with

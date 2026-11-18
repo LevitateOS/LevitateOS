@@ -417,9 +417,17 @@ fn lock_rpm(root: &Path, distro: &Distro, bundle: &distro_contract::Variant, che
         eprintln!("[step] Read {repo}");
         primary_index(&repo, &mut newest)?;
     }
+    // The excluded packages are not in the index: nothing can pull them in,
+    // and a requirement on one of their names is met by the image.
+    let excluded = &bundle.contract.desktop.exclude;
+    if let Some(unknown) = excluded.iter().find(|n| !newest.contains_key(*n)) {
+        bail!("desktop.exclude names {unknown}, which Fedora {release} has no x86_64/noarch build of; remove it from distro.toml");
+    }
+    newest.retain(|name, _| !excluded.contains(name));
     let index = Index::new(newest);
     let desktop_packages = &group_seeds(root, PackageBackend::Rpm)?;
-    let assumed: HashSet<&str> = base.provided_elsewhere.iter().map(String::as_str).collect();
+    let assumed_names = assumed_capabilities(&bundle.contract);
+    let assumed: HashSet<&str> = assumed_names.iter().map(String::as_str).collect();
     let base_set = index.resolve(&base.packages, BTreeSet::new(), &assumed)?;
     let mut desktop_set = index.resolve(desktop_packages, base_set.clone(), &assumed)?;
     desktop_set.retain(|n| !base_set.contains(n));
@@ -455,6 +463,16 @@ fn lock_rpm(root: &Path, distro: &Distro, bundle: &distro_contract::Variant, che
         bail!("{stale} package(s) differ from the locks; run cargo xtask base lock {}", distro.id());
     }
     Ok(())
+}
+
+/// The capabilities the RPM locks take as met without a package: what the
+/// image supplies itself (`provided_elsewhere`) and the names of the excluded
+/// packages (`desktop.exclude`), which a requirement of another package may
+/// still name.
+pub(super) fn assumed_capabilities(contract: &distro_contract::ConformanceContract) -> Vec<String> {
+    let mut names = contract.sources.rootfs_source.base.provided_elsewhere.clone();
+    names.extend(contract.desktop.exclude.iter().cloned());
+    names
 }
 
 /// Every x86_64/noarch package of the release and updates repositories (the

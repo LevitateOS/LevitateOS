@@ -42,8 +42,12 @@ Marks: `[x]` done (committed, unbuilt), `[ ]` to do, **L** LevitateOS,
 - [x] **L A** recstrap's free space: the 2 GiB floor stays as the check before
   the image is mounted; once it is, recstrap refuses a target that cannot
   take the image's own size plus a tenth and 64 MiB, before copying.
-- [ ] **L A** Lock generation needs an exclude list (`--exclude` for dnf), used
-  below to drop Fedora's art packages.
+- [x] **L** Lock generation has an exclude list: `desktop.exclude` in
+  `distro.toml` (RPM backend; contract field, `xtask` `base lock` and `base
+  groups`). The excluded packages are left out of the index, and a requirement
+  on one of their names counts as met by the image; `provided_elsewhere`
+  names the capabilities (`system-logos`) the image supplies. Written
+  2026-11-18; the lock regenerated without them.
 - [x] **A** The accounts Alpine's install scripts would add are read from
   those scripts (apk keeps them in `lib/apk/db/scripts.tar.gz`): every
   `addgroup`/`adduser` is carried out, and a form the recipe does not read
@@ -76,12 +80,12 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
   complementary, header, title bar groups; the band for headers and title
   bars). Written, unbuilt.
 - [x] **L** `/etc/xdg/kdeglobals`: the starting mode's scheme (dark on
-  LevitateOS) with its colours, Fedora's Global Theme of that mode
-  (`org.fedoraproject.fedoralight.desktop` / `fedoradark`), Breeze icons of
-  that mode, no accent from the wallpaper. Fedora's light and dark Global
-  Themes name our schemes in their defaults, since Plasma copies those into
-  each user's `kdedefaults` ahead of `/etc/xdg`. Until our own Global Theme
-  replaces them. Written, unbuilt.
+  LevitateOS) with its colours, KDE's Breeze Global Theme of that mode
+  (`org.kde.breezedark.desktop` / `org.kde.breeze.desktop`; Fedora's are gone),
+  Breeze icons of that mode, no accent from the wallpaper. Breeze's Global
+  Themes name our schemes and our wallpaper in their defaults (`Image=`), since
+  Plasma copies those into each user's `kdedefaults` ahead of `/etc/xdg`.
+  Until our own Global Theme replaces them. Written, unbuilt.
 - [x] **L** Konsole: `LevitateOSLight` / `LevitateOSDark` terminal schemes and a
   default profile (`/etc/xdg/konsolerc`) in the dark one (a terminal is dark
   on both distros, whatever the desktop's mode). Written,
@@ -89,12 +93,21 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
 - [ ] **L** A launcher icon that follows a light or dark panel
   (`distributor-logo-levitateos-symbolic`); approved, to be drawn and
   reviewed (decision 12).
-- [ ] **L** Drop Fedora's branding from the lock: `fedora-logos` (ask for
-  `generic-logos`), `plasma-lookandfeel-fedora`, `kde-settings`,
-  `kde-settings-plasma`, `kde-settings-sddm`, `desktop-backgrounds-*`,
-  `f45-backgrounds-*`, `fedora-release*` if the desktop request pulls them in.
-  When `kde-settings-plasma` goes, the start button step must set the icon
-  through our own Global Theme instead of Fedora's scripts.
+- [x] **L** Drop Fedora's branding from the lock (owner decision 2026-11-18:
+  Breeze until an own theme exists): `fedora-logos`, `plasma-lookandfeel-fedora`,
+  `kde-settings`, `kde-settings-plasma`, `desktop-backgrounds-kde`,
+  `f45-backgrounds-base` and `-kde` are in `desktop.exclude`; `system-logos`
+  (Breeze's icons ask for it) is `provided_elsewhere`, not `generic-logos`,
+  whose files carry Fedora's names. `kde-settings-sddm`, `fedora-release*` and
+  `desktop-backgrounds-compat` were never in the closure. The plasma recipe
+  sets the start button's icon and the menu's favourites in the default panel
+  template, and writes what kde-settings set that the desktop needs: an empty
+  session at login (`ksmserverrc`), no Baloo indexing of the home folder
+  (`baloofilerc`), the clock without a password (polkit), `xdg-user-dirs`
+  as a seed. Dropped on purpose: Fedora's double-click default (Plasma's
+  single click now), Noto font defaults (Plasma's own), the Fedora wallpapers,
+  video player and chat defaults, `ssh-agent`/GTK scrolling environment
+  scripts, the on-screen keyboard setting. Written, unbuilt.
 - [x] **L** Remove the two Fedora files inside packages we keep:
   `usr/share/sddm/themes/01-breeze-fedora` (removed) and Firefox's
   `firefox-redhat-default-prefs.js` (rewritten without Fedora's start page).
