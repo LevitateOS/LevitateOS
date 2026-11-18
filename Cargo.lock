@@ -1583,9 +1583,11 @@ name = "install-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "colored",
  "distro-builder",
  "distro-contract",
+ "ed25519-dalek",
  "levitate-recipe",
  "recab",
  "recinit",
