@@ -51,7 +51,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use super::base::{self, Layer, curl, rel, sha256_file};
+use super::base::{self, Layer, curl, pinned_url, rel, sha256_file};
 use crate::cli::Distro;
 use distro_contract::profile::PackageBackend;
 
@@ -1212,6 +1212,8 @@ fn parse_repo(reader: impl std::io::BufRead, repo: &str, out: &mut RepoBuilds) -
     let mut xml = quick_xml::Reader::from_reader(reader);
     let mut buf = Vec::new();
     let mut current: Option<RepoBuild> = None;
+    let mut href = String::new();
+    let mut sourcerpm = String::new();
     let mut field: Option<&'static str> = None;
     let mut deps = "";
     loop {
@@ -1225,6 +1227,8 @@ fn parse_repo(reader: impl std::io::BufRead, repo: &str, out: &mut RepoBuilds) -
                 };
                 match e.name().as_ref() {
                     b"package" => {
+                        href.clear();
+                        sourcerpm.clear();
                         current = Some((
                             base::Rpm {
                                 name: String::new(),
@@ -1258,6 +1262,7 @@ fn parse_repo(reader: impl std::io::BufRead, repo: &str, out: &mut RepoBuilds) -
                     b"name" => field = Some("name"),
                     b"arch" => field = Some("arch"),
                     b"rpm:license" => field = Some("license"),
+                    b"rpm:sourcerpm" => field = Some("sourcerpm"),
                     b"checksum" => {
                         field = (attr(b"type").as_deref() == Some("sha256")).then_some("sha256")
                     }
@@ -1274,8 +1279,8 @@ fn parse_repo(reader: impl std::io::BufRead, repo: &str, out: &mut RepoBuilds) -
                         }
                     }
                     b"location" => {
-                        if let (Some((rpm, _, _)), Some(href)) = (current.as_mut(), attr(b"href")) {
-                            rpm.url = format!("{repo}{href}");
+                        if let Some(h) = attr(b"href") {
+                            href = h;
                         }
                     }
                     _ => {}
@@ -1288,6 +1293,7 @@ fn parse_repo(reader: impl std::io::BufRead, repo: &str, out: &mut RepoBuilds) -
                         "name" => rpm.name = text,
                         "arch" => rpm.arch = text,
                         "sha256" => rpm.sha256 = text,
+                        "sourcerpm" => sourcerpm = text,
                         "file" => rpm.provides.push(text),
                         "license" => *license = text,
                         _ => {}
@@ -1300,9 +1306,10 @@ fn parse_repo(reader: impl std::io::BufRead, repo: &str, out: &mut RepoBuilds) -
                     deps = "";
                 }
                 if e.name().as_ref() == b"package"
-                    && let Some(build) = current.take()
+                    && let Some(mut build) = current.take()
                     && !build.0.sha256.is_empty()
                 {
+                    build.0.url = pinned_url(repo, &href, &sourcerpm, &build.0.arch);
                     match build.0.arch.as_str() {
                         "x86_64" | "noarch" => {
                             out.native.insert(build.0.name.clone(), build);

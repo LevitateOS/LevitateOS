@@ -30,6 +30,12 @@ use crate::cli::Distro;
 use distro_contract::profile::PackageBackend;
 
 const MIRROR: &str = "https://dl.fedoraproject.org/pub/fedora/linux";
+const KOJI: &str = "https://kojipkgs.fedoraproject.org/packages";
+/// Short id of Fedora 45's signing key (distro.toml `signing_key`). koji's
+/// plain file of a build is the unsigned one; the signed RPM the repositories
+/// carry, with the same checksum, is under `data/signed/<key id>/`. Change it
+/// with the release.
+const KOJI_KEY: &str = "f577861e";
 
 /// One RPM build as a repository's primary index lists it.
 #[derive(Clone, Debug)]
@@ -630,6 +636,28 @@ pub(super) fn sha256_file(path: &Path) -> Result<String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
+/// The URL a package is pinned at. The releases repository never changes, so
+/// its packages keep the mirror URL. Fedora deletes a superseded build from
+/// the updates repository, so those packages are pinned at koji, which keeps
+/// every build: `packages/<source name>/<version>/<release>/data/signed/<key>/<arch>/<file>`,
+/// all three of source name, version and release taken from the package's
+/// sourcerpm.
+pub(super) fn pinned_url(repo: &str, href: &str, sourcerpm: &str, arch: &str) -> String {
+    let mirror_url = format!("{repo}{href}");
+    if !repo.contains("/updates/") {
+        return mirror_url;
+    }
+    let Some(stem) = sourcerpm.strip_suffix(".src.rpm") else { return mirror_url };
+    // name-version-release of the source package, which is not the binary's
+    // own version (nspr 4.39.0-10 is built from nss 3.133.0-1).
+    let mut parts = stem.rsplitn(3, '-');
+    let (Some(release), Some(version), Some(source)) = (parts.next(), parts.next(), parts.next()) else {
+        return mirror_url;
+    };
+    let file = href.rsplit('/').next().unwrap_or(href);
+    format!("{KOJI}/{source}/{version}/{release}/data/signed/{KOJI_KEY}/{arch}/{file}")
+}
+
 /// Fold a repository's x86_64 and noarch packages into `newest`, keeping the
 /// newest build of each name.
 fn primary_index(repo: &str, newest: &mut BTreeMap<String, Rpm>) -> Result<()> {
@@ -688,6 +716,8 @@ fn parse_primary(reader: impl std::io::BufRead, repo: &str, newest: &mut BTreeMa
     let mut xml = quick_xml::Reader::from_reader(reader);
     let mut buf = Vec::new();
     let mut current: Option<Rpm> = None;
+    let mut href = String::new();
+    let mut sourcerpm = String::new();
     let mut field: Option<&'static str> = None;
     // Which dependency list an `rpm:entry` belongs to; weak ones are skipped.
     let mut deps = "";
@@ -696,6 +726,8 @@ fn parse_primary(reader: impl std::io::BufRead, repo: &str, newest: &mut BTreeMa
         match xml.read_event_into(&mut buf)? {
             Event::Start(e) | Event::Empty(e) => match e.name().as_ref() {
                 b"package" => {
+                    href.clear();
+                    sourcerpm.clear();
                     current = Some(Rpm {
                         name: String::new(),
                         epoch: "0".into(),
@@ -730,6 +762,7 @@ fn parse_primary(reader: impl std::io::BufRead, repo: &str, newest: &mut BTreeMa
                 b"file" => field = Some("file"),
                 b"name" => field = Some("name"),
                 b"arch" => field = Some("arch"),
+                b"rpm:sourcerpm" => field = Some("sourcerpm"),
                 b"checksum" => {
                     let is_sha256 = e
                         .attributes()
@@ -751,11 +784,9 @@ fn parse_primary(reader: impl std::io::BufRead, repo: &str, newest: &mut BTreeMa
                     }
                 }
                 b"location" => {
-                    if let Some(rpm) = current.as_mut() {
-                        for a in e.attributes().flatten() {
-                            if a.key.as_ref() == b"href" {
-                                rpm.url = format!("{repo}{}", String::from_utf8_lossy(&a.value));
-                            }
+                    for a in e.attributes().flatten() {
+                        if a.key.as_ref() == b"href" {
+                            href = String::from_utf8_lossy(&a.value).into_owned();
                         }
                     }
                 }
@@ -768,6 +799,7 @@ fn parse_primary(reader: impl std::io::BufRead, repo: &str, newest: &mut BTreeMa
                         "name" => rpm.name = text,
                         "arch" => rpm.arch = text,
                         "sha256" => rpm.sha256 = text,
+                        "sourcerpm" => sourcerpm = text,
                         "file" => rpm.provides.push(text),
                         _ => {}
                     }
@@ -779,7 +811,11 @@ fn parse_primary(reader: impl std::io::BufRead, repo: &str, newest: &mut BTreeMa
                     deps = "";
                 }
                 if e.name().as_ref() == b"package"
-                    && let Some(rpm) = current.take()
+                    && let Some(mut rpm) = current.take()
+                    && {
+                        rpm.url = pinned_url(repo, &href, &sourcerpm, &rpm.arch);
+                        true
+                    }
                     && (rpm.arch == "x86_64" || rpm.arch == "noarch")
                     && !rpm.sha256.is_empty()
                     && newest.get(&rpm.name).is_none_or(|cur| evr_cmp(&rpm, cur) == Ordering::Greater)
