@@ -1,5 +1,28 @@
 # Release readiness: when can LevitateOS and AcornOS be published and marketed?
 
+## What stands between 2026-11-18 and a public release of both ISOs
+
+State: superproject `6df2b7fb` passed every scenario on both distros (build, desktop boot, A/B and mutable installs, the 1.0 to 1.1 update through a local signed channel). The public key is committed (`distro/keys/release/2026-11.pub`), `LevitateOS/releases` exists (empty: no release, no channel file, no `SECURITY.md`), and `release keygen|sign|publish` exist. Kinds: **W** = work Claude does, **D** = decision only the owner can make, **O** = owner action (signing, uploads, publishing).
+
+1. **D** One batch of decisions (asked and answered 2026-11-18: 1.0 labelled preview, VM-tested; category parts; written offer plus source manifest; all defaults below accepted): the first release's label and what it may lack (real laptops, disk encryption, Secure Boot, codecs); where an ISO over 2 GiB is hosted (answered: category parts, section 11 of release-engineering.md); how GPL source is provided; and the small defaults below.
+2. **W** ISO over 2 GiB: owner decision 2026-11-18, `release-engineering.md` section 11. The package cache leaves the ISO and is cut by category into parts of under 1.5 GiB; `release publish` uploads them as assets of the same GitHub release, listed in the signed manifest; the installer downloads and verifies the parts it needs (`recupdate fetch-parts`). Both ISOs end up around 1.1 GiB.
+3. **W** LevitateOS Fedora branding out of the lock: `fedora-logos`, `f45-backgrounds-*`, `desktop-backgrounds-kde`, `kde-settings*`, `plasma-lookandfeel-fedora` (dnf `--exclude` in lock generation, `desktop-todo.md` sections 1 and 2). Needs a re-lock, no build. Check Acorn's `alpine-release` and os-release text the same way.
+4. **W** Source for the GPL and LGPL packages: a source manifest from the locks (every SRPM and APK source with URL and hash) and the offer text, written by `build release`. Alpine pins can disappear, so the same step keeps what the offer points at.
+5. **W** Licence notices: the overview inside the image and on the website, and `SECURITY.md` for the superproject, the website and the releases repository.
+6. **W** Website: download page filled from the release manifest (version, ISO URL, SHA-512, size), the `/releases/<os>/<version>` notes route that `release_notes` points at, "planned for 2027" removed from the download and home pages and `variants.ts`, footer links for security and licences. Built locally, not deployed.
+7. **W** Release notes for each distro with the known limits (UEFI only, Secure Boot off, no encryption, x86_64 only, tested in VMs only if laptops stay untested), and the stale statements in this document and in `daily-driver-audit.md` corrected.
+8. **W** One verification: `cargo xtask build release levitate` and `acorn`, then every install scenario and `desktop-boot` on both. Starts only when items 2 to 7 are written.
+9. **W** Release set per distro prepared: `release.json` written, ISO, `.sha512`, notes. Unsigned and unuploaded.
+10. **O** Back up `~/.config/levitate/release.key` offline. A lost key means reinstalling every computer, and it has not been done.
+11. **O** (optional, may follow the release) Two real laptops, one Intel and one AMD, per `daily-driver-audit.md` stage 2. Decision 1 says whether this gates the release.
+12. **O** The publish step, only after an explicit yes: `cargo xtask release publish levitate` and `acorn` (signs, uploads, writes `channels/<os>/stable.json`), the website deploy, and retiring the old "Boot to shell" `v.0.1.0-alpha` release.
+
+Defaults taken unless the owner says otherwise: Recipe's version is 0.2.0 (published 2026-11-17, decision 3 closed); ISO byte-determinism is not a release requirement; the release is built from `LevitateOS/ginux:main` (decision 5 closed, it already carries every merged upstream PR); no analytics; support through GitHub issues only; "daily driver" wording stays out of the first release.
+
+Not blockers for a first release, listed as known limits in the notes: stage 4 (codecs install and remove, `ld.so.cache`), disk encryption, Secure Boot signing, NVIDIA proprietary driver, hardware checklist. Systems built before 2026-11-18 cannot `recab update`, and schema-1 systems need a reinstall; nobody outside the owner runs them.
+
+The sections below are the research of 2026-11-11 and are kept as background; where they disagree with this list, this list wins.
+
 > 2026-11-15: section A3 (the P14 "public update channel" with Pages, per-distro keys, trial and fallback) and "base and desktop systems" as image contents are superseded by docs/release-engineering.md: signed releases named 1.0, 1.1, ... published at github.com/LevitateOS/releases (repository not created yet), `recupdate`, `recab update`, `recupdate apply` and the Updater app, one Ed25519 key on the owner's machine, and the desktop as Recipe group recipes (docs/product-handoff.md §2.4). All of it is in source, never built or run.
 
 Research of 2026-11-11. The question: what has to be true before the two

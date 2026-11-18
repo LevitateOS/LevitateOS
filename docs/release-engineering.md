@@ -272,3 +272,41 @@ JSON lines, the same for `recupdate fetch|apply --json` and
 - `{"event":"progress","done":123,"total":456}` (bytes of the current step)
 - `{"event":"done","restart_needed":true,"version":"1.1","serial":4}`
 - `{"event":"failed","error":"<one line>"}` followed by a non-zero exit
+
+## 11. Category parts: the ISO stays small, the installer downloads the rest
+
+Decided by the owner on 2026-11-18. The desktop ISOs were over 2 GiB (LevitateOS:
+system image 1031 MiB plus the release overlay 1227 MiB, nearly all of it the
+default software set's package cache; AcornOS about 1.8 GiB) and GitHub release
+assets stop at 2 GiB. Splitting the ISO into numbered pieces was rejected. The
+package cache is cut by **category** instead and taken out of the ISO.
+
+- The ISO carries the system, the live session, the installer and the default
+  set's recipes and list, with no package cache. It is well under 2 GiB.
+- A **category** is a named group of the variant's `[desktop].recipes` (for
+  example `desktop`, `browser`, `fonts`, `hardware`, `apps`; the grouping is
+  declared per variant in `distro.toml`). Each category becomes one **part**:
+  `parts-<category>.tar.zst`, the package-cache files its recipes pin. A cache
+  file lives in exactly one part (the first category that needs it, so parts do
+  not overlap) and every part is under 1.5 GiB; the build fails above that.
+- The signed manifest lists them: `"parts": [{"name","category","url","sha256","size"}]`
+  beside `base`, `boot`, `recipes` and `iso`. `publish` uploads each part as an
+  asset of the same release (`levitateos-<serial>` in `LevitateOS/releases`),
+  next to the ISO. That is where the downloadable parts live.
+- During installation, recsetup's software step first fetches the parts the
+  chosen default set needs, then Recipe installs from the cache as before. The
+  fetch is `recupdate fetch-parts`: it reads the release the live medium was
+  built from (`/usr/lib/levitate/release.json` names the serial), downloads that
+  release's `release.json` and `.sig` from the release's own assets (never the
+  channel pointer, which may already name a newer release), verifies the
+  signature with the keys on the medium, then downloads and verifies each part
+  into the cache and unpacks it into `RECIPE_CACHE_DIR`. Interrupted downloads
+  resume. A part already present with the right hash is not fetched again.
+- The live session needs a network for this (NetworkManager is in the live
+  overlay already). Without one the installer says which parts are missing and
+  what size they are, and offers a folder to read them from, for a person who
+  downloaded the parts beforehand.
+- Everything else stays: nothing is installed or applied without the person
+  starting it, no AI is involved, and a changed part changes only the hash in
+  the manifest. `recupdate apply` and `recab update` are not changed: they take
+  recipes from `recipes.tar.zst` and files from the same cache mechanism.
