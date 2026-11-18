@@ -108,6 +108,13 @@ Details and paths are in [desktop-theming.md](desktop-theming.md).
   single click now), Noto font defaults (Plasma's own), the Fedora wallpapers,
   video player and chat defaults, `ssh-agent`/GTK scrolling environment
   scripts, the on-screen keyboard setting. Written, unbuilt.
+- [x] **A** Alpine's branding checked (2026-11-18): `/etc/issue` and
+  `/etc/os-release` are the image's own already; `/etc/motd` from
+  alpine-baselayout ("Welcome to Alpine!", `setup-alpine`) is replaced by
+  `installed-system.rhai` with "Welcome to AcornOS."; the boot menus use the
+  contract's `os_name`; no Alpine logos or wallpapers are in the lock
+  (`lxqt-themes` carries LXQt's own art). `/etc/alpine-release` (the base's
+  version, 3.24.4) and `alpine-keys` stay: tools read them. Unbuilt.
 - [x] **L** Remove the two Fedora files inside packages we keep:
   `usr/share/sddm/themes/01-breeze-fedora` (removed) and Firefox's
   `firefox-redhat-default-prefs.js` (rewritten without Fedora's start page).
