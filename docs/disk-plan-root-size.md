@@ -1,0 +1,66 @@
+# Disk plan: A/B root size
+
+Written 2026-11-18. Not fixed yet. This file says what is wrong and what the fix is.
+
+## What is wrong
+
+A 40 GB disk (37.3 GiB) is refused in A/B mode by the install screen's disk step (`disk-plan`, method "Erase the disk").
+
+1. **The root size is a guess, far too big.** `tools/recpart/src/policy.rs` fixes the A/B layout at:
+
+   | Partition | Size |
+   |---|---|
+   | EFI | 1 GiB (`DEFAULT_EFI_SIZE_MB`) |
+   | Root A | 20 GiB (`DEFAULT_AB_ROOT_SIZE_MB`) |
+   | Root B | 20 GiB |
+   | State (`/var`, home) | at least 4 GiB (`DEFAULT_AB_MIN_STATE_MB`), takes the rest |
+
+   That is about 45 GiB before any data, so `min_disk_mb(Ab)` is above a 40 GB disk. Nothing in the repo explains the 20 GiB, or the 8 GiB minimum (`MIN_AB_ROOT_MB`).
+
+   A LevitateOS desktop root holds 4.96 GB in 129,192 files (`recab compare`, 2026-11-18), and AcornOS less. User files live in the state partition. Only software that Recipe installs into the system (`/usr`) grows the roots, and both roots must hold it.
+
+2. **Erase mode has no size choice.** recpart already takes `--root-a-size-mb`, `--root-b-size-mb` and `--state-size-mb`. But `planCommand`/`applyCommand` in `tools/tui/apps/install/disk-plan/src/app/plan-runner.ts` pass only `--disk` and `--mode` (or a `--layout` file from the partition editor). So erase mode always gets the fixed defaults. Only the "edit" method, the partition editor, lets a user size partitions, and that is far more work than picking one number.
+
+3. **The requirements hide it.** The system requirements and the website's download page say 64 GB. The install tests use large virtual disks, so nothing ran into it.
+
+## The fix
+
+1. **recpart, a measured default.**
+   - Each A/B root defaults to about twice the release's installed size, rounded up: about 10 GiB for LevitateOS today, less for AcornOS.
+   - The size is shrunk to fit the disk after EFI and the 4 GiB state minimum.
+   - The minimum is the installed size plus a small margin, not a fixed 8 GiB.
+   - The installed size comes from the image the live medium carries, so the number follows the release instead of being a constant.
+2. **disk-plan, a root-size field in erase mode.**
+   - One value, used for both slots so they stay equal, prefilled with the default.
+   - The page shows what is left for the state partition as the value changes.
+   - `planCommand`/`applyCommand` pass `--root-a-size-mb` and `--root-b-size-mb`.
+   - The mode contract (`tools/recpart/src/contract.rs`, `generated/recpart.ts`) carries the new default and minimum.
+3. **Requirements.** The guide's system requirements and the download page get the real minimum disk, around 32 GB for A/B.
+
+## Until then: partitioning without disk-plan
+
+In the install screen's shell, as root, on the target disk (here `/dev/vda`; `recpart list-disks` names the candidates).
+
+1. Preview, then apply, with your root size (MiB; state takes the rest):
+
+   ```bash
+   recpart apply --disk /dev/vda --mode ab --root-a-size-mb 10240 --root-b-size-mb 10240 --dry-run
+   recpart apply --disk /dev/vda --mode ab --root-a-size-mb 10240 --root-b-size-mb 10240 --confirm DESTROY
+   ```
+
+   This erases the disk. It formats and mounts root A at `/mnt`, EFI at `/mnt/boot` and state at `/mnt/var`, and prints the mount map (`path <- device`) and both slot devices.
+
+2. Record the disk step, so `base-system` and `system-setup` find it. Copy the devices from apply's output; on a VM disk they are usually `vda1` EFI, `vda2` root A, `vda3` root B, `vda4` state:
+
+   ```bash
+   mkdir -p /run/install && cat > /run/install/state.json <<'EOF'
+   {"schema":1,"steps":{"disk":{"done_at":"2026-11-18T00:00:00Z","result":{
+     "disk":"/dev/vda","mode":"ab","target":"/mnt",
+     "mounts":[{"path":"/mnt","device":"/dev/vda2"},{"path":"/mnt/boot","device":"/dev/vda1"},{"path":"/mnt/var","device":"/dev/vda4"}],
+     "slot_a":"/dev/vda2","slot_b":"/dev/vda3","root_device":"/dev/vda2"}}}}
+   EOF
+   ```
+
+   Keep the `mounts` order as apply printed it.
+
+3. Continue with the guide's next steps as usual: `base-system`, then `system-setup`.
