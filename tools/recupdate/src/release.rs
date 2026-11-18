@@ -18,6 +18,27 @@ pub struct Archive {
     pub size: u64,
 }
 
+/// One category part of the release (`parts-<category>.tar.zst`): the package-cache files the
+/// default set's recipes of that category pin. Empty `url` and `sha256` mean not published.
+#[derive(Deserialize, Clone)]
+pub struct Part {
+    pub name: String,
+    pub category: String,
+    pub url: String,
+    pub sha256: String,
+    pub size: u64,
+}
+
+impl Part {
+    pub fn archive(&self) -> Archive {
+        Archive {
+            url: self.url.clone(),
+            sha256: self.sha256.clone(),
+            size: self.size,
+        }
+    }
+}
+
 #[derive(Deserialize, Clone)]
 pub struct Manifest {
     pub schema: u32,
@@ -31,6 +52,8 @@ pub struct Manifest {
     pub recipes: Archive,
     #[serde(default)]
     pub notes: String,
+    #[serde(default)]
+    pub parts: Vec<Part>,
 }
 
 impl Manifest {
@@ -75,6 +98,7 @@ pub fn os_release() -> Result<OsRelease> {
 }
 
 pub struct Installed {
+    pub os: String,
     pub version: String,
     pub serial: u64,
 }
@@ -89,12 +113,14 @@ pub fn installed() -> Result<Installed> {
     })?;
     #[derive(Deserialize)]
     struct Record {
+        os: String,
         version: String,
         serial: u64,
     }
     let record: Record = serde_json::from_str(&text)
         .with_context(|| format!("{} is not a release manifest", path.display()))?;
     Ok(Installed {
+        os: record.os,
         version: record.version,
         serial: record.serial,
     })
@@ -174,6 +200,76 @@ pub fn load_channel() -> Result<Verified> {
     );
     Ok(Verified {
         plain_http: url.starts_with("http://"),
+        manifest,
+        bytes,
+        sig: sig_text,
+    })
+}
+
+/// The base address of one release's own assets: `RECUPDATE_RELEASE_BASE_URL` (a local test
+/// channel), else the GitHub release `<os>-<serial>` of LevitateOS/releases. Always ends in `/`.
+pub fn release_base_url(os_id: &str, serial: u64) -> String {
+    let mut base = std::env::var("RECUPDATE_RELEASE_BASE_URL")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| {
+            format!("https://github.com/LevitateOS/releases/releases/download/{os_id}-{serial}/")
+        });
+    if !base.ends_with('/') {
+        base.push('/');
+    }
+    base
+}
+
+/// The manifest of the release this medium was built from (never the channel pointer, which
+/// may already name a newer one): `release.json` and its `.sig` from the release's own assets,
+/// or from the folder `from`, verified against the keys; `os` must be this system's and
+/// `serial` exactly the medium's.
+pub fn load_medium_release(from: Option<&Path>) -> Result<Verified> {
+    let os = os_release()?;
+    let installed = installed()?;
+    ensure!(
+        installed.os == os.id,
+        "the installed release record is for {}, this system is {}",
+        installed.os,
+        os.id
+    );
+    let keys = keys()?;
+    let (bytes, sig_text, what, sig_what, plain_http) = match from {
+        Some(dir) => {
+            let read = |name: &str| -> Result<(Vec<u8>, String)> {
+                let path = dir.join(name);
+                let meta = fs::metadata(&path)
+                    .with_context(|| format!("cannot read {} (the folder must hold {name})", path.display()))?;
+                ensure!(
+                    meta.is_file() && meta.len() <= CHANNEL_FILE_LIMIT,
+                    "{} is not a file of at most {CHANNEL_FILE_LIMIT} bytes",
+                    path.display()
+                );
+                Ok((fs::read(&path)?, path.display().to_string()))
+            };
+            let (bytes, what) = read("release.json")?;
+            let (sig, sig_what) = read("release.json.sig")?;
+            (bytes, sig, what, sig_what, false)
+        }
+        None => {
+            let base = release_base_url(&os.id, installed.serial);
+            let url = format!("{base}release.json");
+            let sig_url = format!("{url}.sig");
+            let bytes = crate::net::get_bounded(&url, CHANNEL_FILE_LIMIT)?;
+            let sig = crate::net::get_bounded(&sig_url, CHANNEL_FILE_LIMIT)?;
+            (bytes, sig, url, sig_url, base.starts_with("http://"))
+        }
+    };
+    let manifest = verify(&keys, &os, &bytes, &sig_text, &what, &sig_what)?;
+    ensure!(
+        manifest.serial == installed.serial,
+        "{what} is serial {}, this medium was built from serial {}; refusing it",
+        manifest.serial,
+        installed.serial
+    );
+    Ok(Verified {
+        plain_http,
         manifest,
         bytes,
         sig: sig_text,

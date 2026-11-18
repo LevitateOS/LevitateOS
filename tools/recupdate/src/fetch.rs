@@ -115,7 +115,7 @@ pub fn into_cache(channel: &Verified, report: &Report) -> Result<PathBuf> {
     Ok(dir)
 }
 
-fn get_archive(
+pub fn get_archive(
     dir: &Path,
     name: &str,
     archive: &Archive,

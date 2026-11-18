@@ -10,6 +10,7 @@ window and decides nothing: recab, the mutable updater and the apps call it. Des
 | --- | --- | --- |
 | `recupdate check [--json]` | anyone | Fetch the channel file, verify it, say whether a newer release exists, and whether an apply was interrupted. Exit 0 whether or not one exists; non-zero with the reason on stderr when the check failed. |
 | `recupdate fetch [--json]` | root | Download the release's `base`, `boot` and `recipes` archives into the cache folder and verify each SHA-256. Interrupted downloads resume. |
+| `recupdate fetch-parts [--json] [--categories a,b] [--from DIR] [--list]` | root | Download the category parts of the release this medium was built from, verify them and unpack them into Recipe's package cache (below). |
 | `recupdate notice` | root | Run the check and write `available.json`. Run daily by a timer. A failed check keeps the previous file. |
 | `recupdate notify-user` | each user | Read `available.json`; send one desktop notification per new serial (`notify-send`, else `gdbus call`). |
 | `recupdate apply [--json]` | root | Install the channel's release on a mutable installation (below). Refuses an A/B installation and names `recab update`. |
@@ -30,6 +31,42 @@ than the installed one. Archives are downloaded to `<name>.part` (at most the ma
 `size`, exactly that at the end), checked against the manifest's SHA-256, then renamed.
 Manifest URLs must be https, except that a channel given as an `http://` address (a local or test channel via `RECUPDATE_CHANNEL_URL`) may list `http://` archives; the public https channel never can. A resumed `apply` checks the cached `release.json` against its
 `.sig` and the keys again.
+
+## `recupdate fetch-parts` (the installer's package cache)
+
+The release ISOs carry no package cache. The default software set's downloads are published
+as one **part** per category (`parts-<category>.tar.zst`, listed in the manifest's `parts`
+array; design: `docs/release-engineering.md` section 11), and recsetup's software step runs
+this command before Recipe installs the set.
+
+- **Which release.** The one the running medium was built from: `os` and `serial` come from
+  `/usr/lib/levitate/release.json`. `release.json` and `release.json.sig` are downloaded from
+  that release's own assets, `https://github.com/LevitateOS/releases/releases/download/<os>-<serial>/`
+  (at most 64 KiB each; never the channel pointer, which may already name a newer release),
+  and verified exactly as for `check`, except that `serial` must be **equal** to the medium's.
+  `--from DIR` takes `release.json`, `release.json.sig` and the part files
+  (`parts-<category>.tar.zst`) from a folder instead of the network, with the same checks;
+  the folder is read, never changed.
+- **Each part.** Downloaded to `<cache>/parts/<serial>/<name>.tar.zst.part`, resumed after an
+  interruption, checked for size and SHA-256 against the signed manifest, renamed, then
+  unpacked into the recipe cache folder (default `/usr/share/recipe/cache`, the literal of
+  `install_tools::RECIPE_CACHE_DIR` in `tools/recstrap/src/lib.rs`; keep them equal). The
+  downloaded archive is removed after unpacking. `<cache>/parts/<serial>/<name>.done` holds
+  the part's SHA-256 once it is fully unpacked; a part with that record is skipped.
+  `--categories a,b` limits the run to those categories (default: every part of the manifest).
+- **Unpacking.** Regular files, folders and links that stay inside the cache folder. An
+  absolute path, a `..`, a link that points outside, a hard link or a special file ends the
+  run with an error. Nothing is written through a symbolic link (a folder component that is
+  one is refused).
+- **`--list`** downloads nothing but the manifest and prints
+  `{"parts":[{"name","category","size","present":true|false}]}` (`present`: unpacked already).
+- **Events** with `--json`: `step` (1 is the manifest, then one per part), `progress`
+  (bytes of the current part), `done` (`restart_needed: false`) or `failed`, as for `fetch`.
+- URLs in the manifest must be https, except when the base address was given as an
+  `http://` override (`RECUPDATE_RELEASE_BASE_URL`), the rule `fetch` applies to a channel.
+- Overrides (tests): `RECUPDATE_RELEASE_BASE_URL` (the folder address holding `release.json`;
+  a trailing `/` is added), `RECUPDATE_KEYS_DIR`, `RECUPDATE_RELEASE_FILE`,
+  `RECUPDATE_CACHE_DIR`, `RECUPDATE_RECIPE_CACHE_DIR`.
 
 ## `recupdate apply` (mutable installations)
 
@@ -105,7 +142,8 @@ from step 3.
 Overrides (tests): `RECUPDATE_CHANNEL_URL` (the full address of the channel file; `.sig` is
 appended), `RECUPDATE_KEYS_DIR`, `RECUPDATE_RELEASE_FILE`, `RECUPDATE_CACHE_DIR`,
 `RECUPDATE_STATE_DIR` (the folder of `available.json` and `applying.json`),
-`RECUPDATE_RECIPE_BIN` (the program `apply` runs instead of `recipe` on `PATH`). The ESP,
+`RECUPDATE_RECIPE_BIN` (the program `apply` runs instead of `recipe` on `PATH`); the
+`fetch-parts` overrides are listed in its section. The ESP,
 efivarfs, `/proc/cmdline` and the A/B facts have no override: `apply` reads the running
 system's.
 
@@ -116,8 +154,10 @@ system's.
 
 ## Not done
 
-- Never run: written against the design, only type-checked (`cargo clippy`). No command,
-  `apply` included, has run on a real or stand-in system.
+- Never run on a real or stand-in system: only type-checked (`cargo clippy`). `fetch-parts`
+  was run once with `--from` against a hand-made signed stand-in release (list, unpack,
+  skip of an unpacked part, a `..` archive, a bad signature); its network path and `apply`
+  have not run.
 - The previous kernel entry is a working fallback only if that kernel's modules
   (`/usr/lib/modules/<old release>`) are still on `/` after Recipe replaced `base`. Nothing
   keeps them yet: Recipe's `apply-release` (or the base's layout) has to.
