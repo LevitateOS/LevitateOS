@@ -114,7 +114,7 @@ fn sudo_command(root: &Path, bin: &Path) -> std::process::Command {
         "GINUX_MINIMAL_ROOT",
         "GINUX_MINIMAL_ROOTFS",
         "RECIPE_BIN",
-        "RECIPE_FRAME_TIMEOUT_SECS",
+        "RECIPE_OUTPUT_TIMEOUT_SECS",
     ] {
         if let Some(value) = std::env::var_os(name) {
             set(name, &value);

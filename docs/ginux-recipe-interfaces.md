@@ -26,7 +26,7 @@ The builder uses the current Recipe library and its matching CLI (or explicit
 `RECIPE_BIN`), binds typed declaration inputs and consumes validated named
 outputs. It builds the launcher from `tools/ginux` and sets `GINUX_BIN` to it and
 `RECIPE_WORKER_BIN` to the CLI it runs, whatever the environment says; it
-forwards `GINUX_ROOT`, `GINUX_ROOTFS` and `RECIPE_FRAME_TIMEOUT_SECS`; other
+forwards `GINUX_ROOT`, `GINUX_ROOTFS` and `RECIPE_OUTPUT_TIMEOUT_SECS`; other
 ambient Recipe/Ginux controls are removed. Whole-coordinator bootstrap privileges and appropriately
 privileged consumers are required; launcher-only sudo wrappers lose channels.
 See [Linux setup](../tools/recipe/docs/setup-linux.md) and
@@ -248,7 +248,7 @@ CLI SIGINT/SIGTERM forwards to the process group and awaits teardown (SIGINT exi
 Library callers opt in to signal installation. Coordinator death also terminates
 the supervisor/workload; it cannot publish unfinished work.
 
-`RECIPE_FRAME_TIMEOUT_SECS` (default300, range1..86400) bounds startup and partial
+`RECIPE_OUTPUT_TIMEOUT_SECS` (default300, range1..86400) bounds startup and partial
 frame transport. After worker-started traffic, a silent legitimate phase is
 allowed until the separate total invocation deadline; receiving the first byte
 starts a complete-frame deadline. Partial traffic cannot extend it indefinitely.
