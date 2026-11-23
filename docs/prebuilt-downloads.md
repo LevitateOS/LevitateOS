@@ -137,21 +137,23 @@ rebuild or against signed provenance instead. That is not part of this plan.
 
 ### 6. The Recipe runtime image
 
-Recipe's runtime image (the root filesystem tar its Ginux domains run in) is not a
-prebuilt of the key family above. It is identified by the SHA-256 digest of the
-uncompressed tar, which the reference `oci:NAME@sha256:<digest>` already pins.
+Recipe's runtime image (the compiler image as an OCI layout tar, `image.oci.tar`, that its
+Ginux instances run) is not a prebuilt of the key family above. It is identified by its
+manifest digest, which the reference `REGISTRY/REPO@sha256:<manifest>` (such as
+`local/recipe-compiler@sha256:<64 hex>`) already pins.
 `cargo xtask prebuilt publish-runtime` (`distro-builder prebuilt publish-runtime`,
-run as the user with a `gh` login) takes the image the installed Recipe ships,
-checks the tar against that digest, compresses it with `zstd -T0 -19` (default
-window, so any decoder reads it) and uploads `rootfs.tar.zst` and `runtime.json`
+run as the user with a `gh` login) takes the image layout tar the installed Recipe ships,
+checks its manifest against that digest, compresses it with `zstd -T0 -19` (default
+window, so any decoder reads it) and uploads `image.oci.tar.zst` and `runtime.json`
 (`format`, `reference`, `digest`, `tar_bytes`, `zst_sha256`, `zst_bytes`) to the
 release `recipe-runtime-<first 16 hex digits of the digest>` of
 `LevitateOS/prebuilt` (`LEVITATE_PREBUILT_REPO` overrides). Recipe downloads
-`https://github.com/LevitateOS/prebuilt/releases/download/recipe-runtime-<short>/rootfs.tar.zst`
-on first use and verifies the decompressed bytes against the digest, so the
-compressed bytes need no fixed form. The tag is named by the uncompressed
-digest: a release that already has `rootfs.tar.zst` is reported as published and
-left alone. See `docs/recipe-standalone-release.md`.
+`https://github.com/LevitateOS/prebuilt/releases/download/recipe-runtime-<short>/image.oci.tar.zst`
+on first use (as root; the guard allows no `import-image`), decompresses it and imports it with `ginux import-image`, which verifies
+every blob and prints the manifest digest Recipe compares with its reference, so the
+compressed bytes need no fixed form. The tag is named by the manifest digest: a release
+that already has `image.oci.tar.zst` is reported as published and left alone. See
+`docs/recipe-standalone-release.md`.
 
 ## Cheap wins that need no CI
 

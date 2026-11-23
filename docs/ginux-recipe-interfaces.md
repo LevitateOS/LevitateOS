@@ -1,264 +1,271 @@
 # Ginux–Recipe execution interfaces
 
-This describes the current local integration. The [production-readiness queue](ginux-contribution-task-list.md)
-owns remaining work; the [completed implementation plan](recipe-simplification-implementation-plan.md)
-and source-specific validation records retain historical scope and evidence. Recipe API2, worker
-transport9 and Ginux instance schema1 are independent contracts. Coordinator,
-worker and retained records use one current interface; mismatched versions fail
-before recipe setup. This record does not authorize upstream publication.
-Configuration uses `[instance]` and a derived `[userspace.contract]` pinned to
-configured downstream catalog 1002 and the reviewed build-base digests. It requires
-`configured-network-audit=1 configured-denial-audit=1` from `instance-validate`.
-Upstream Gate 11 catalog 2 and native policy stay separate. [PRD02's review](ginux-contributions/prd02-contract-review.md)
-records the prior profile-based reconciliation; [PRD18's active checkpoint](ginux-contributions/prd18-implementation.md)
-records the new implementation, exact-source checks and remaining decisions.
+Status of 2026-11-23: this describes the **public-lifecycle cutover**, written
+and never run. Recipe no longer calls the downstream `ginux launch`; it runs each
+recipe that starts programs as an instance of Ginux on the public lifecycle.
+The design is `tools/recipe/docs/ginux-cutover-design.md` (fixed record), the
+plan and its status are `tools/recipe/docs/ginux-public-lifecycle-migration.md`
+(section 6), and the limits Recipe states are
+`tools/recipe/docs/runtime-limits.md`. The [production-readiness
+queue](ginux-contribution-task-list.md) owns remaining work. Recipe API 1, the
+worker records version and the Ginux instance schema 1 are independent
+contracts; coordinator, worker and retained records use one current interface
+and mismatched versions fail before recipe setup. This record does not authorize
+upstream publication. Everything about frames, checkpoints, autofix, catalog 1002
+and `GINUX_BIN`/`GINUX_ROOT*` that earlier versions of this page recorded is
+gone (see `tools/recipe/CHANGELOG.md`).
 
-[Recipe configured contract 1](ginux-contributions/prd08-public-contracts.md)
-records the user-approved release policy and exact limitations. The current
-configured runtime preserves global clocks, confines large-image-read admission
-to configured launch and returns zero-filled configured sysinfo. Native policy
-choices remain separate. The [PRD15/19 checkpoint](ginux-contributions/prd15-product-contract.md)
-binds the tested runtime and remaining source-delivery/security acceptance.
+## What the interface is
+
+The coordinator (`recipe`) drives the `ginux` CLI, which drives the
+root-owned helper through `sudo`, behind Recipe's root-owned guard
+(`/usr/libexec/recipe/recipe-ginux-guard`, the only program the sudoers rule
+names: it allows Recipe's instance verbs on `recipe-<uid>-*` only, re-renders
+the imported config from validated fields, accepts an image for a non-root
+caller only if its reference is in the root-owned allowlist
+`/usr/libexec/recipe/runtime-images`, and clears the environment).
+Instance directories are root-private (0700) and the helper streams the console
+output to the caller (`start --wait --stream-console`). `import-image` is root's
+only (`sudo recipe runtime fetch`), never through the guard; the shared-host
+exposure that remains (R13-R15, no per-uid caps) is in
+`tools/recipe/docs/runtime-limits.md`:
+
+```text
+ginux --state-root S --run-root R import-image LAYOUT      once per host and image, as root (not via the guard)
+ginux ... import NAME instance.toml                        create
+ginux ... inject  NAME --input inject.tar --into / ...     the worker, request and inputs, one tar
+ginux ... start   NAME --wait                              run to completion
+ginux ... status  NAME --format json                       the outcome record (authority)
+ginux ... extract NAME --output EXPORT ... /work /out      the results, one tar
+ginux ... delete  NAME                                     always, on every path out
+```
+
+Each run is one instance named `recipe-<uid>-<pid>-<random>`; the invocation log
+records the name. Recipe's configuration is Ginux schema 1: `[instance]`
+(root = `local/recipe-compiler@sha256:<manifest digest>`, init
+`/inputs/recipe-worker`), `[resources]`, `[execution] backend = "ptrace-native"`,
+`[access] uid/gid = 1000`, `[contract]` at **catalog 2** (the derived allow/deny
+lists and the reviewed build-base digests, one with and one without an outbound
+grant), `[contract.filesystem]` (read `/`, write and create `/work` and `/out`),
+`[contract.network]` (`outbound = ["tcp:PORT", ...]`, only with a grant),
+`[storage] assignments = []`, `[devices]` (`null`, `random`, `urandom`),
+`[network] backend = "shared"` with a grant and `"none"` without, audit enabled
+and stop-on-failure policy. Recipe validates the complete derived contract
+(`ginux validate`, whose printed digest is checked against Recipe's pin; the
+compiled-in catalog it also prints is not trusted) before creating the instance.
+The digests are placeholders until the verification pass derives them from a
+built fork binary (design section 6), so until then every Ginux validation
+fails by design and names the digest Ginux reported.
 
 ## Caller and release boundaries
 
 The builder uses the current Recipe library and its matching CLI (or explicit
 `RECIPE_BIN`), binds typed declaration inputs and consumes validated named
-outputs. It builds the launcher from `tools/ginux` and sets `GINUX_BIN` to it and
-`RECIPE_WORKER_BIN` to the CLI it runs, whatever the environment says; it
-forwards `GINUX_ROOT`, `GINUX_ROOTFS` and `RECIPE_OUTPUT_TIMEOUT_SECS`; other
-ambient Recipe/Ginux controls are removed. Whole-coordinator bootstrap privileges and appropriately
-privileged consumers are required; launcher-only sudo wrappers lose channels.
-See [Linux setup](../tools/recipe/docs/setup-linux.md) and
+outputs. For a run it copies the Ginux CLI, helper, image tool, runtime and
+allocator into a root-owned folder under `/var/lib/levitate-builder/ginux/`,
+writes a root-owned wrapper there that exports the runtime and image-tool paths
+and execs the helper copy, and sets `RECIPE_GINUX` (the CLI),
+`GINUX_INSTANCE_HELPER` (the wrapper), `RECIPE_IMAGE[_LAYOUT]` and
+`RECIPE_MINIMAL_IMAGE[_LAYOUT]` and `RECIPE_WORKER_BIN`, whatever the
+environment says; it forwards `RECIPE_OUTPUT_TIMEOUT_SECS`; other ambient
+Recipe/Ginux controls are removed. The builder is root, so no sudoers rule is
+involved and the host's `/usr/libexec` is never touched. Appropriately
+privileged consumers are required for products a root build published. See
+[Linux setup](../tools/recipe/docs/setup-linux.md) and
 [runtime limits](../tools/recipe/docs/runtime-limits.md).
 
 The included product contract is the queue's PRD19 table, for both distros.
 Build a fresh test-base-rootfs → test-live-ssh → test-install-base chain explicitly; existing
 parent artifacts are consumed as they stand. Installed-system policy belongs
 to the recipe, live/test policy to its overlay, deployment to recstrap and A/B
-activation to recab. Metadata EROFS production and actual deployment need their
-separate matching receipts. Guest installer PTY interaction is separate from
-version/help and split-pane smoke controls. Neither an assembled ISO nor an
-older VM pass certifies the final delivered combination. Maintained source,
-integration of subsequent local corrections, final product acceptance and security
-remain open as recorded in the
-[PRD15/19 checkpoint](ginux-contributions/prd15-product-contract.md).
+activation to recab. Neither an assembled ISO nor an older VM pass certifies the
+final delivered combination.
+
+## Privileges and hosts
+
+Every privileged verb is the Ginux helper run as root, behind Recipe's guard:
+`sudo /usr/libexec/recipe/recipe-ginux-guard --protocol 1
+--state-root S --run-root R VERB` (Recipe's verbs only; images for a non-root
+caller from `/usr/libexec/recipe/runtime-images`; no `import-image`). Roots run
+the helper without a rule; an administrator runs the guard after `recipe runtime stage --sudoers GROUP` wrote
+`/etc/sudoers.d/recipe-ginux` (`%wheel` on Fedora, Rocky, LevitateOS and
+AcornOS; `%sudo` on Ubuntu), pinned to `/var/lib/recipe/ginux` and
+`/run/recipe/ginux`; nobody else can run a recipe in Ginux. The installed
+LevitateOS and AcornOS images ship the rule and the five Ginux files
+(`/usr/libexec/ginux/{ginux-helper,ginux-image,ginux-runtime}`,
+`/usr/lib64/ginux/libginux_allocator.so`, the CLI at
+`/usr/libexec/recipe/ginux`), and the compiler and minimal image layouts at
+`/usr/share/recipe/runtime/{compiler,minimal}.oci.tar`. The standalone release
+installs them as root on Fedora 44 and Ubuntu 24.04 (not yet run on either).
+There is no user-namespace launch and no AppArmor profile any more.
 
 ## Execution and ownership
 
-Every operation that evaluates recipe code requires the configured Ginux
-launcher. Metadata/hash commands read declarations without evaluating setup.
-There is no host execution selector or fallback. Current execution is native
-Linux/x86-64 through Ginux's configured ptrace backend.
+Every operation that evaluates recipe code that starts programs uses Ginux;
+a recipe that starts none runs on the host (`--execution auto`), and
+metadata/hash commands read declarations without evaluating setup. Current
+execution is native Linux/x86-64 through Ginux's native configured runtime.
 
-The coordinator invokes:
+Selection: `RECIPE_GINUX` (the CLI), `RECIPE_GINUX_STATE_ROOT` /
+`RECIPE_GINUX_RUN_ROOT` (default `/var/lib/recipe/ginux`, `/run/recipe/ginux`),
+`GINUX_INSTANCE_HELPER` (the CLI's own variable, passed through),
+`RECIPE_IMAGE` = `local/recipe-compiler@sha256:<OCI manifest digest>` with
+`RECIPE_IMAGE_LAYOUT` (the layout directory or its uncompressed tar, needed
+only while the image is not imported), and the minimal pair. The old
+`GINUX_BIN`, `GINUX_ROOT`, `GINUX_ROOTFS`, `GINUX_MINIMAL_ROOT` and
+`GINUX_MINIMAL_ROOTFS` are refused with the name of their replacement. The
+image identity is the manifest digest; the import verifies every blob and
+prints the digest, which must equal the reference's. Each run's root is a
+private instance root made from the imported image; the instance is deleted
+when the run ends, and a sweep at the start of the next Ginux-using command
+deletes the instances of dead runs of the same user (root: every user).
 
-```text
-ginux launch CONFIG PREPARED_ROOT --result-file RESULT --export-file EXPORT
-```
-
-It additionally passes `--control-fd` for checkpoint requests and
-`--restore-file` when restoring matching owned files. These host paths and file
-descriptors are coordinator-owned; recipes cannot choose them. The launcher
-result is authoritative alongside the worker protocol. Missing/malformed records,
-contradictory exits, incomplete frames or missing terminal results fail explicitly.
-A supervisor failure after worker activity is distinguished from startup failure.
-A successful worker frame precedes final archive export: the coordinator awaits
-actual launcher completion within the remaining execution deadline. The short
-teardown grace applies to errors/cancellation. A killed/nonzero launcher cannot
-publish products even if the worker and an existing result file reported success.
-
-`GINUX_BIN` selects the launcher. `GINUX_ROOTFS` selects an assembled uncompressed
-tar; `GINUX_ROOT=oci:NAME@sha256:DIGEST` identifies those exact tar bytes, not an
-OCI manifest. The input owner snapshots and hashes the selected archive, extracts
-without following links, and creates a private invocation root. It imports the
-matching Recipe worker (`RECIPE_WORKER_BIN` for library callers), recipes and
-explicit selected inputs. Roots live until the supervisor is reaped, then are
-removed. Active leases prevent concurrent pruning.
+The coordinator's authority is `ginux status --format json` (the outcome
+record `exited`/`signaled`/`supervisor-error`), read after `start --wait`
+returns, in agreement with the worker's result file; contradictions, a killed or
+nonzero `start`, and a missing result fail the run without publication. The
+results come out as one tar of `/work` and `/out` (`ginux extract`, bounded by
+the recipe's storage bounds) only after a clean `exited` outcome.
 
 ## Instance paths and recipe contract
 
 | Purpose | Path and authority |
 | --- | --- |
-| Worker, recipes, modules, declared assets/source closures | `/inputs`, immutable snapshots |
-| Work/build directory | `/work/build`, owned writable storage |
-| Dependency tools and cache | `/work/tools`, owned writable storage |
-| Temporary files | `/work/tmp`, owned writable storage |
-| Installed target and selected products | `/out`, owned writable storage |
+| Worker, request file, recipes, modules, declared assets/source closures | `/inputs`, copies injected before the run, read-only by contract and mode |
+| Work/build directory | `/work/build`, the instance root |
+| Dependency tools and cache | `/work/tools` |
+| Temporary files | `/work/tmp` |
+| Installed target and selected products | `/out` |
+| Hosts file | `/etc/hosts`, always present: `localhost`, then the pinned names |
 
 Recipes declare `const RECIPE_API = 1;` and their own literal `const NEEDS`.
 NEEDS owns required/optional typed inputs, defines, exact typed products,
 endpoint grants and upper limits; the coordinator reads it without evaluating
 the recipe. Recipe reads the other declarations (`SOURCES`, `FILES`, `PACKAGES`,
 ...) the same way, downloads and unpacks the sources itself, and calls the
-recipe's optional functions (`build(src, out)`, `configure(tree)`, `verify(out)`)
-with the engine's constants (`INPUTS`, `DEFINES`, `DEPS`, `WORK`, ...) visible.
-Package facts come from the current source. A thrown error fails the run.
-Recipe decides a program's state from its own records; no recipe code runs to
-decide it. Dependencies run in separate Ginux instances with separate grants
-and state/files pairs. Callers bind `DEP::NAME` inputs explicitly; parent
-inputs/grants are never lent. Declared dependency outputs reach the consumer
-through `DEPS`, and directory outputs named `tools` contribute to the
-consumer's `PATH`. Cleanup is optional; a failure keeps the original
-producer failure authoritative.
+recipe's optional functions (`build(src, out)`, `configure(tree)`, `verify(out)`,
+`latest()`, `cleanup(reason)`) with the engine's constants visible. A thrown
+error fails the run. Recipe decides a program's state from its own records; no
+recipe code runs to decide it. Dependencies run in separate instances with
+separate grants. Callers bind `DEP::NAME` inputs explicitly; parent inputs and
+grants are never lent. Declared dependency outputs reach the consumer through
+`DEPS`, and directory outputs named `tools` contribute to the consumer's `PATH`.
+An interrupted step keeps nothing and starts again; there are no checkpoints.
 
 `--input NAME=PATH` binds a declared `file`, `directory`, `file?` or
 `directory?` input. Required missing, unknown, duplicate or wrong-kind inputs fail
 preflight across the complete declared graph. Source imports omit root
 `.git`/`target`, preserve contained relative links and reject escapes/cycles.
 Named filesystem inputs `rootfs` and `target` preserve filesystem link bytes,
-including absolute links meaningful in a future root. Imported hardlinks share
-private snapshot backing; they never alias mutable host input bytes. A
+including absolute links meaningful in a future root. Inputs travel into the
+instance as one tar of directories, regular files and symlinks, so **hard links
+are not preserved** (a file linked twice arrives as two files) and live system
+roots (`--system`, a root's effects recipe) are **copied, not bound**. A
 coordinator-authored permission manifest lets copying helpers preserve original
 logical modes despite read-only imports. A `target` directory seeds `/out` only
 for fresh state; an acknowledged matching filesystem takes precedence on reuse.
+The offline cache reaches a run as copies of the payloads whose pins the recipe
+declares.
 
-NEEDS.outputs declares exact names and file/directory kinds under owned storage.
-The worker checks returned names/kinds; the coordinator independently prepares
-and validates the export privately before committing final state/files and
-publishing fresh paths. Complete installation and installed reuse require the
-exact output set. Intermediate phases may expose a subset; every present output
-is checked before checkpoint/publication. Failed work cannot replace previous publications. The final
-result's `outputs` contains those host paths; the worker never selects host
-destinations. The coordinator adds completion metadata (contract and network
-usage) to the result. Each
-invocation saves its actual declaration/config, pins and contract in
-`authority.json`. Invocation explanations include that saved `execution`, making
-resolved bounds and caller restrictions visible alongside the declaration.
-Finite Ginux endpoint and contract-denial summaries remain
-available after syscall-trace truncation; a missing observation is explicitly
-unknown, never an implicit success or proof that a grant was unused.
+NEEDS.outputs declares exact names and file/directory kinds under `/out`. The
+worker checks returned names/kinds; the coordinator independently prepares and
+validates the extracted archive privately before committing final state and
+publishing fresh paths. Failed work cannot replace previous publications. The
+final result's `outputs` contains those host paths; the worker never selects
+host destinations. The coordinator adds completion metadata (contract and network
+usage) to the result. Each invocation saves its actual declaration, config
+(and the instance name), pins and contract in `authority.json`.
 
 ## Options, bounds and network policy
 
-Resolved execution values cross the request explicitly: native target,
-`jobs`1..16, phase force flags, timeout, memory/storage bounds, network endpoints
-and machine events. NEEDS supplies authority; caller restrictions may only lower
-limits/select endpoint subsets. Main-recipe force flags are cleared for
-dependencies. Missing NEEDS limits default to 3600 seconds, 2048MiB, 16,384
-storage objects and 8GiB network bytes; a missing network grants none. Explicit
-caller restrictions cap every dependency's own limits and intersect its endpoints.
-They never lend grants. Manual readiness checks require matching cached
-dependency products and never install them. Explicit dependent-recipe `remove`
-and `cleanup` selection remains unresolved by user direction; this release
-cannot claim that boundary accepted until a separate decision and verification.
-No coordinator-wide environment mutation supplies invocation state.
+Resolved execution values cross the request explicitly: native target, `jobs`
+1..16, phase force flags, timeout, memory and storage bounds, network endpoints
+and machine events (a `network` grant record with the pinned endpoints and the
+byte cap goes to the worker for Recipe's own downloads). NEEDS supplies
+authority; caller restrictions may only lower limits/select endpoint subsets.
+Main-recipe force flags are cleared for dependencies. Missing NEEDS limits
+default to 3600 seconds, 2048MiB, 16,384 storage objects and 8GiB network bytes;
+a missing network grants none. Explicit caller restrictions cap every
+dependency's own limits and intersect its endpoints. They never lend grants.
 
-Resource enforcement is specific: Ginux applies `memory_mib` as inherited
-**per-process virtual address-space** limits (`RLIMIT_AS`) and constrains the
-child CPU affinity to at most the requested available CPUs. This is not aggregate
-domain RSS or cumulative CPU time. Owned storage has separate byte/metadata
-accounting, with explicit object/data limits; shared hardlink bytes count once.
-If `max_bytes` is omitted, the actual data cap subtracts page-rounded namespace/backing-table
-metadata from the selected memory budget. Recipe uses the full memory value only
-as a conservative outer archive bound. Public descriptors and tasks remain bounded. Supervisor-private backing FDs
-reserve capacity independently of the public descriptor table and respect the
-host hard limit. Unsupported operations fail; this is not complete Linux ABI
-coverage. Large source consumers select sufficient explicit storage/memory policy
-in their literal recipe NEEDS rather than relying on small-tool defaults.
+What is enforced, and what is not (the accepted regressions are stated plainly
+in `tools/recipe/docs/runtime-limits.md`):
 
-Outbound networking requires NEEDS.network endpoints; repeated
-`--network-host HOST:PORT` (or library `ExecutionOptions.narrowing`) can only
-select a subset. Empty policy produces `network.backend="none"`.
-The coordinator resolves at most eight numeric TCP endpoints before launch,
-with bounded resolver time/output, and writes an immutable hostname map inside
-the private root. Ginux enforces destination, simultaneous connection (16) and cumulative
-send+receive byte budgets (default8GiB); aliases/fork retain ownership and teardown
-revokes sockets. No proxy inheritance, arbitrary DNS, UDP or listening access is
-provided. Redirect destinations need their own grant. **An IP:port grant cannot
-isolate virtual hosts or URL paths sharing that endpoint.**
+- `memory_mib` is the per-process virtual address-space bound; jobs select real
+  CPUs by affinity; the deadline is enforced by Recipe signalling the run's
+  process group. None is aggregate RSS or CPU time.
+- **No storage limit inside a run.** The instance root is a directory tree on
+  the host file system holding the state root. `storage_max_bytes` and
+  `storage_max_objects` bound only the archive taken out of the instance, an
+  output over them fails the run after the fact, and a free-space watchdog
+  cancels a run whose host disk drops below `max(2 GiB, 5 %)`.
+- **Network grants are per port.** Outbound networking requires NEEDS.network
+  endpoints; repeated `--network-host HOST:PORT` (or library
+  `ExecutionOptions.narrowing`) can only select a subset; an empty policy
+  produces `network.backend="none"`. The coordinator resolves at most eight
+  numeric TCP endpoints before launch, with bounded resolver time and output,
+  and injects the hostname map; Ginux is given `tcp:PORT` for each distinct
+  port on the shared host network. A program a recipe starts can connect to any
+  address on a granted port, with no connection or byte cap, and sees the host's
+  network. Recipe's own HTTP client in the worker is held to the declared
+  `HOST:PORT` at the pinned addresses and counts every body against
+  `network_max_bytes`; `network_usage` is what the worker counted. No proxy
+  inheritance, arbitrary DNS, UDP or listening access is provided. Redirect
+  destinations need their own grant. **A port grant cannot isolate addresses,
+  virtual hosts or URL paths.**
 
 HTTP helpers validate normal TLS trust and hostnames using the prepared image's
 CA bundle; test-only CA images are explicitly separate inputs. Canonical
 acquisition is `download(url, exact_destination, sha256[, resume])` and
 `git_checkout(url, exact_destination, full_commit)`. Transfers stage privately,
-validate complete bytes/revisions, then replace cache entries. Invalid digests,
-truncation, denied endpoints and missing commits preserve earlier valid cache.
-A grant is permission to contact an endpoint, not permission to skip verification.
+validate complete bytes/revisions, then replace cache entries. A grant is
+permission to contact an endpoint, not permission to skip verification.
 
-The config retains Ginux schema1, the derived configured catalog-1002 contract,
-ptrace-native backend,
-stderr audit and stop-on-failure policy. Recipe checks config≤4096 bytes,
-id≤64 bytes, paths≤128, args≤7×128, env≤8×256 and assignment bounds before launch.
-The environment contains fixed domain PATH, worker/invocation identity and TMPDIR;
-only explicit allowlisted toolchain variables may be added. Host HOME, checkout
-paths, credentials and ambient proxy variables do not cross this boundary.
+Recipe checks config≤4096 bytes, name≤64 bytes (the instance name is
+`recipe-<uid>-<pid>-<8 hex>`), args≤7×128, env≤8×256 and assignment bounds
+before the instance is created. The environment contains the fixed domain PATH,
+worker/invocation identity and TMPDIR; only explicit allowlisted toolchain
+variables may be added. Host HOME, checkout paths, credentials and ambient proxy
+variables do not cross this boundary.
 
-## Worker transport9
+## Worker records
 
-Each frame is `[u32 BE length][u32 BE version=9][u32 BE sequence][u16 BE op]`
-followed by UTF-8 JSON. Length includes the 14-byte header and is at most4MiB.
-Each direction starts at sequence1; gaps, replay, wrong direction, unsupported
-versions and truncated/oversized payloads abort that invocation.
+There is no frame protocol. The request is the staged input
+`/inputs/.recipe-request.json`; the result is the file
+`/work/.recipe-result.json` (written atomically, naming its version and the
+invocation id, read from the extracted archive as untrusted input); diagnostics
+and progress are JSON lines on the worker's stdout, which in a Ginux run is the
+instance's console (`console.log`, read while the run lives) and on the host is
+a pipe. A line that is not a record stays plain log text; lines starting
+`GINUX_` are runtime text kept in the supervisor log, not relayed. The
+worker's stderr and the runtime's audit lines land in the instance's
+`audit.log`, retained as `supervisor-stderr.log`. Diagnostics carry bytes
+without result authority; a forged line can become plain text, never success.
+Diagnostics are bounded (`MAX_DIAGNOSTIC_BYTES`, `MAX_DIAGNOSTIC_RECORDS`),
+then one truncation marker; output continues draining. CLI human output uses stderr; structured context
+JSON stays on stdout. `RECIPE_OUTPUT_TIMEOUT_SECS` (default 300, range
+1..86400) bounds the wait before the first line and for a line begun but not
+ended; a silent legitimate phase afterwards runs until the execution deadline.
 
-| Op | Direction | Payload |
-| --- | --- | --- |
-|1 request | Coordinator→worker | invocation_id, operation, persist_state, cleanup_reason, options, restored_states |
-|2 checkpoint | Worker→coordinator | seq, canonical `/inputs/...` recipe identity, state object |
-|3 ack | Coordinator→worker | checkpoint seq and durable generation |
-|5 result | Worker→coordinator | ok, optional typed failure (kind, phase, message), ctx_summary; sent exactly once |
-|6 diagnostic | Worker→coordinator | stream, raw byte array, truncated marker |
+## Recovery and cancellation
 
-Op4 is retired. Transport9 rejects older coordinator/worker grant models before
-setup. Each separately launched recipe has state keyed by its staged identity; package facts and runtime
-paths are not restored from saved source text. A checkpoint pauses recipe progress
-until Ginux exports owned files and the coordinator durably records their matching
-state generation. Ack follows that durable pair. Interrupted writes retain the
-last complete generation. `--no-persist-state` suppresses reuse and durable state
-claims, acknowledging a null generation. It does not enable source rewriting.
+Identity includes the request/result records version, exact image reference (the
+OCI manifest digest), worker and Ginux behaviour versions (Ginux behaviour 2 is
+the public lifecycle), input content and modes, network resolution/policy,
+defines and target/job/storage choices. Changing these selects fresh state; the
+cutover itself changes every saved identity once. Destination locks serialize
+publication and state joins. Diagnostic history retains 32 inactive invocations
+and protects live leases; each log is bounded.
 
-Snapshots use validated USTAR with GNU longname/longlink extensions, regular
-files, directories, symlinks and hardlink references to prior regular objects.
-Hardlinks require matching mode/mtime. Absolute domain paths are bounded to255 bytes including their leading slash
-(tar member names at most254); individual file sizes must fit the USTAR size
-field (less than8GiB). Headers
-are bounded by `3 * max_objects`, total bytes by
-`max_storage_bytes + 3072 * max_objects + 1024`. Traversal, conflicting parents,
-forward/invalid aliases and malformed metadata fail without publication. Export,
-restart and publication preserve mode, hardlink identity and mtime seconds.
-USTAR does not persist nanoseconds or atime; unsupported timestamps fail export.
-Owned objects currently project virtual uid/gid0; chown preserves0 or unchanged
-IDs and rejects other owners. The supported archive mode contract is basic
-permission bits, not arbitrary Linux ownership/setuid metadata. The canonical
-QEMU payload excludes its unused privileged host bridge helper explicitly.
-Prepared rootfs cases do not establish complete distribution metadata fidelity.
-
-Diagnostics carry bytes without checkpoint or result authority. Shared sender
-locking prevents interleaved frames. Chunks≤768 bytes, total16MiB or32,768 frames,
-then one empty truncation marker; output continues draining. CLI human output
-uses stderr; structured context JSON stays on stdout. Machine lifecycle events
-are explicitly requested and cross this diagnostic channel. Raw child progress
-may remain in the separately retained supervisor log.
-
-## Recovery, cancellation and optional repair
-
-Identity includes transport version, exact image/worker/input content and modes,
-network resolution/policy, defines and target/job/storage choices. Changing these
-selects fresh state. Operation, force flags and diagnostic choices do not erase
-valid recovery points. Destination locks serialize publication and state joins.
-Under the selected state directory (default user-state `recipe`), identities retain
-current/previous complete generations across four recent identities. Retention
-recognizes its own records/files and preserves unknown operator files. Diagnostic
-history retains32 inactive invocations and protects live leases.
-
-Durable `logs/INVOCATION/{result.json,worker.log,supervisor-stderr.log,lease}`
-survives temporary-root cleanup. Each log is bounded16MiB. Results distinguish
-success, workload/protocol/startup/storage failure, deadline and cancellation.
-CLI SIGINT/SIGTERM forwards to the process group and awaits teardown (SIGINT exit130).
-Library callers opt in to signal installation. Coordinator death also terminates
-the supervisor/workload; it cannot publish unfinished work.
-
-`RECIPE_OUTPUT_TIMEOUT_SECS` (default300, range1..86400) bounds startup and partial
-frame transport. After worker-started traffic, a silent legitimate phase is
-allowed until the separate total invocation deadline; receiving the first byte
-starts a complete-frame deadline. Partial traffic cannot extend it indefinitely.
-
-Optional autofix runs outside the domain in the coordinator after an eligible
-structured build/install failure. Attempts are explicitly bounded, providers and
-patch processes have timeout/cancellation teardown, and readiness/protected edits
-are rejected. Accepted source changes are rehashed and launch a fresh identity.
-Ordinary execution requires no provider or credentials. Controlled provider
-integration proves retry mechanics; it does not claim external-provider behavior.
+CLI SIGINT/SIGTERM signals the process group of `ginux start --wait` (sudo
+relays it to the helper, whose teardown stops the instance within about 7.5 s)
+and awaits it, then deletes the instance; SIGINT exits 130. If the coordinator
+dies, the CLI dies with it, the helper notices within a fraction of a second and
+tears the instance down, and the next Ginux-using command deletes the stopped
+instance. Nothing that is unfinished is published. There is no provider, agent
+or autofix anywhere in Recipe.
 
 See the [task queue evidence](recipe-simplification-implementation-plan.md#current-checkpoint)
-for actual workloads, revisions and limits on kernel, full-ISO and VM validation.
+for historical workloads, revisions and limits on kernel, full-ISO and VM
+validation: they were measured on the retired runtime and certify nothing about
+this one.

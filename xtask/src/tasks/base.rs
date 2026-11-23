@@ -259,6 +259,38 @@ const KERNEL_DEPS: &[&str] = &[
     "findutils",
 ];
 
+/// The root filesystem tar of the compiler image produced in `layout` (the OCI
+/// image layout `recipe-image` writes): its one layer, the blob the manifest
+/// `index.json` names lists first.
+fn compiler_image_layer(layout: &Path) -> Result<PathBuf> {
+    let read = |path: &Path| -> Result<serde_json::Value> {
+        let bytes = std::fs::read(path).with_context(|| {
+            format!(
+                "the pinned compiler image is not produced at {} ({} is missing); \
+                 produce it as tools/recipe/docs/setup-linux.md describes",
+                layout.display(),
+                path.display()
+            )
+        })?;
+        serde_json::from_slice(&bytes).with_context(|| format!("parsing {}", path.display()))
+    };
+    let blob = |digest: &serde_json::Value| -> Result<PathBuf> {
+        let hex = digest
+            .as_str()
+            .and_then(|digest| digest.strip_prefix("sha256:"))
+            .filter(|hex| hex.len() == 64 && hex.bytes().all(|b| b.is_ascii_hexdigit()))
+            .with_context(|| format!("the image layout {} names a blob that is not sha256", layout.display()))?;
+        Ok(layout.join("blobs/sha256").join(hex))
+    };
+    let index = read(&layout.join("index.json"))?;
+    let manifest = read(&blob(&index["manifests"][0]["digest"])?)?;
+    let layer = blob(&manifest["layers"][0]["digest"])?;
+    if !layer.is_file() {
+        bail!("the image layout {} lacks its layer {}", layout.display(), layer.display());
+    }
+    Ok(layer)
+}
+
 /// `base kernel-deps`: resolve [`KERNEL_DEPS`] and their closure from the
 /// Rocky 10 BaseOS and AppStream primary indexes (newest build of each
 /// name, no weak dependencies), check every RPM against its repository
@@ -277,16 +309,10 @@ pub fn kernel_deps_lock(check: bool) -> Result<()> {
     }
     let index = Index::new(newest);
     // What the compiler image already has, from its own rpmdb in the pinned
-    // rootfs tar: only what those packages do not provide is locked, as
+    // image's one layer: only what those packages do not provide is locked, as
     // `dnf download --resolve` against that rpmdb used to download only
     // what was missing.
-    let tar = root.join(".artifacts/ginux-env/prepared-image-build-tools/rootfs.tar");
-    if !tar.is_file() {
-        bail!(
-            "the pinned compiler image {} is not produced; run any OS build first so Recipe stages it",
-            tar.display()
-        );
-    }
+    let tar = compiler_image_layer(&root.join(".artifacts/ginux-env/prepared-image-build-tools"))?;
     let db = tempfile::tempdir()?;
     let status = Command::new("tar")
         .args(["-xf"])

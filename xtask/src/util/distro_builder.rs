@@ -78,7 +78,7 @@ pub fn run_unprivileged(root: &Path, command: &Command) -> Result<()> {
 }
 
 /// `sudo -n env ... <bin>`: the builder as root, with the user's toolchain and a
-/// target directory of its own (root's cargo builds of Recipe and the Ginux launcher
+/// target directory of its own (root's cargo builds of Recipe and the Ginux tools
 /// then write no root-owned files into `target/` or the user's registry, and run
 /// offline). The compiler image selection variables and `RECIPE_BIN` pass through
 /// when set; the builder picks the pinned image itself otherwise.
@@ -101,7 +101,7 @@ fn sudo_command(root: &Path, bin: &Path) -> std::process::Command {
     set("RUSTUP_HOME", &user_dir("RUSTUP_HOME", ".rustup"));
     set("CARGO_NET_OFFLINE", "true".as_ref());
     // The directory root's builds have always used. Another path rebuilds Recipe
-    // and the Ginux launcher into different bytes (debug info records it), and
+    // and the Ginux tools into different bytes (debug info records it), and
     // their digests are part of every Recipe cache identity.
     set(
         "CARGO_TARGET_DIR",
@@ -109,10 +109,10 @@ fn sudo_command(root: &Path, bin: &Path) -> std::process::Command {
     );
     for name in [
         "RUSTUP_TOOLCHAIN",
-        "GINUX_ROOT",
-        "GINUX_ROOTFS",
-        "GINUX_MINIMAL_ROOT",
-        "GINUX_MINIMAL_ROOTFS",
+        "RECIPE_IMAGE",
+        "RECIPE_IMAGE_LAYOUT",
+        "RECIPE_MINIMAL_IMAGE",
+        "RECIPE_MINIMAL_IMAGE_LAYOUT",
         "RECIPE_BIN",
         "RECIPE_OUTPUT_TIMEOUT_SECS",
     ] {

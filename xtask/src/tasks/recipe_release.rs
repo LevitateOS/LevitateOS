@@ -1,6 +1,6 @@
 //! `release recipe`: the standalone Recipe release (package name `recipe-pm`).
 //!
-//! Takes explicit inputs (the static `recipe`, the Ginux launcher, the runtime reference, the
+//! Takes explicit inputs (the static `recipe`, the five Ginux tools, the runtime reference, the
 //! recipes catalog), lets Recipe stage its own runtime tree, and packs that tree into every
 //! release format. Nothing here needs rpmbuild, dpkg or abuild: RPM, deb and apk are written
 //! in-process so the release builds on any host. The design is docs/recipe-standalone-release.md.
@@ -21,13 +21,20 @@ const LICENSE: &str = "MIT OR Apache-2.0";
 const SUMMARY: &str = "Recipe, the package manager that builds software inside Ginux";
 const DESCRIPTION: &str = "Recipe acquires, builds, installs, updates and removes software from \
 recipes, running every build inside the Ginux sandbox. The package holds the static recipe \
-command, the Ginux launcher and the official recipe source. The runtime image (about 330 MB) \
-is downloaded on first use.";
-const CONFFILES: [&str; 2] = ["etc/profile.d/recipe.sh", "etc/apparmor.d/recipe-ginux"];
-const PROFILE: &str = "/etc/apparmor.d/recipe-ginux";
+command, Recipe's root-owned guard (the only program the sudoers rule names), the Ginux tools \
+(CLI, privileged helper, image tool, runtime and allocator), a sudoers rule that lets the \
+administrators' group run the guard, and the official recipe source. The runtime \
+image (about 330 MB) is downloaded and imported on first use.";
+const CONFFILES: [&str; 2] = ["etc/profile.d/recipe.sh", SUDOERS];
+/// The sudoers rule `recipe runtime stage --sudoers GROUP` writes (mode 0440).
+const SUDOERS: &str = "etc/sudoers.d/recipe-ginux";
+/// Recipe's guard, built next to `recipe`; staged root-owned 0755 at `usr/libexec/recipe/recipe-ginux-guard`.
+const GUARD_FILE: &str = "recipe-ginux-guard";
 const MANIFEST: &str = "/usr/local/share/recipe/install-manifest";
+/// The five Ginux files `--ginux-dir` holds, by these names.
+const GINUX_FILES: [&str; 5] = ["ginux-cli", "ginux-helper", "ginux-image", "ginux-runtime", "libginux_allocator.so"];
 
-const USAGE: &str = "usage: cargo xtask release recipe [--version V] [--out DIR] [--recipe-bin FILE] [--launcher FILE] [--publish]
+const USAGE: &str = "usage: cargo xtask release recipe [--version V] [--out DIR] [--recipe-bin FILE] [--ginux-dir DIR] [--publish]
 
 Builds the standalone Recipe release (package recipe-pm): tarball with install.sh, a
 packager tarball, RPM, deb and apk, the AUR and Void build files, SHA256SUMS,
@@ -37,20 +44,22 @@ provenance.json and RELEASE_NOTES.md, into .artifacts/recipe-release/<version>/.
   --out DIR          output folder (default .artifacts/recipe-release/<version>; must be empty)
   --recipe-bin FILE  use this recipe instead of the static one from distro-builder (the published
                      prebuilt tools-<key16> of the current key when one exists, else compiled here)
-                     (not static: the release is marked unofficial and cannot be published)
-  --launcher FILE    use this Ginux launcher instead of building tools/ginux
+                     (not static: the release is marked unofficial and cannot be published);
+                     Recipe's guard, `recipe-ginux-guard`, is the file of that name next to it
+  --ginux-dir DIR    use the Ginux files in DIR (ginux-cli, ginux-helper, ginux-image, ginux-runtime,
+                     libginux_allocator.so) instead of building tools/ginux
   --publish          create the GitHub release in LevitateOS/recipe (official builds only)";
 
 struct Args {
     version: Option<String>,
     out: Option<PathBuf>,
     recipe_bin: Option<PathBuf>,
-    launcher: Option<PathBuf>,
+    ginux_dir: Option<PathBuf>,
     publish: bool,
 }
 
 fn parse(args: &[String]) -> Result<Args> {
-    let mut a = Args { version: None, out: None, recipe_bin: None, launcher: None, publish: false };
+    let mut a = Args { version: None, out: None, recipe_bin: None, ginux_dir: None, publish: false };
     let mut it = args.iter();
     while let Some(arg) = it.next() {
         let mut value = |name: &str| {
@@ -60,7 +69,7 @@ fn parse(args: &[String]) -> Result<Args> {
             "--version" => a.version = Some(value("--version")?),
             "--out" => a.out = Some(value("--out")?.into()),
             "--recipe-bin" => a.recipe_bin = Some(value("--recipe-bin")?.into()),
-            "--launcher" => a.launcher = Some(value("--launcher")?.into()),
+            "--ginux-dir" => a.ginux_dir = Some(value("--ginux-dir")?.into()),
             "--publish" => a.publish = true,
             other => bail!("unknown argument {other}\n\n{USAGE}"),
         }
@@ -142,24 +151,59 @@ pub fn run(args: Vec<String>) -> Result<()> {
         eprintln!("WARNING: {msg}. This release is marked \"official\": false and cannot be published.");
         official = false;
     }
-    let launcher = match &args.launcher {
-        Some(p) => p.clone(),
-        None => build_launcher(&root, &ginux_dir)?,
-    };
-    ensure!(launcher.is_file(), "launcher {} does not exist", launcher.display());
-    if !is_static_x86_64_elf(&launcher)? {
-        let msg = format!("{} is not a static x86_64 ELF", launcher.display());
-        if args.launcher.is_none() {
-            bail!("{msg}; the Ginux build in tools/ginux should be freestanding, check tools/ginux/.cargo/config.toml");
+    // Recipe's guard is built with recipe and lies next to it: the one program the sudoers
+    // rule names, installed root-owned at /usr/libexec/recipe/recipe-ginux-guard.
+    let guard = recipe_bin.with_file_name(GUARD_FILE);
+    ensure!(
+        guard.is_file(),
+        "Recipe's guard {} does not exist; build it with recipe (cargo build --release --bin recipe-ginux-guard) and keep it next to the recipe binary",
+        guard.display()
+    );
+    if !is_static_x86_64_elf(&guard)? {
+        let msg = format!("the guard {} is not a static x86_64 ELF (it would not run on any x86_64 Linux)", guard.display());
+        if args.recipe_bin.is_none() {
+            bail!("{msg}; the distro-builder tools build of levitate-recipe should produce it static musl next to recipe, check its output");
         }
         eprintln!("WARNING: {msg}. This release is marked \"official\": false and cannot be published.");
         official = false;
     }
-    let (reference, image_sha) = runtime_reference(&recipe_dir)?;
-    let short = &image_sha[..16];
+    let ginux = match &args.ginux_dir {
+        Some(dir) => {
+            let file = |name: &str| dir.join(name);
+            Ginux {
+                cli: file(GINUX_FILES[0]),
+                helper: file(GINUX_FILES[1]),
+                image: file(GINUX_FILES[2]),
+                runtime: file(GINUX_FILES[3]),
+                allocator: file(GINUX_FILES[4]),
+            }
+        }
+        None => build_ginux(&root)?,
+    };
+    for (name, path) in ginux.files() {
+        ensure!(path.is_file(), "Ginux file {name} ({}) does not exist", path.display());
+    }
+    // The runtime is freestanding; the CLI and image tool are static musl programs, so the
+    // release runs on any x86_64 Linux.
+    for (name, path) in [("runtime", &ginux.runtime), ("CLI", &ginux.cli), ("image tool", &ginux.image)] {
+        if !is_static_x86_64_elf(path)? {
+            let msg = format!("the Ginux {name} {} is not a static x86_64 ELF", path.display());
+            if args.ginux_dir.is_none() {
+                bail!("{msg}; distro-builder builds it static (recipe::ginux::tools), check its output");
+            }
+            eprintln!("WARNING: {msg}. This release is marked \"official\": false and cannot be published.");
+            official = false;
+        }
+    }
+    let (reference, image_digest) = runtime_reference(&recipe_dir)?;
+    let short = &image_digest[..16];
     check_runtime_release(short)?;
     ensure!(catalog.join("index.json").is_file(), "recipes/ has no index.json; run `git submodule update --init recipes`");
-    for (name, path) in [("recipe", &recipe_bin), ("launcher", &launcher), ("catalog index", &catalog.join("index.json"))] {
+    let index = catalog.join("index.json");
+    let mut named: Vec<(&str, &Path)> = vec![("recipe", &recipe_bin), ("recipe guard", &guard)];
+    named.extend(ginux.files());
+    named.push(("catalog index", &index));
+    for (name, path) in named {
         let hash = sha256_file(path)?;
         println!("input    {name:<13} {hash}  {}", path.display());
         inputs.insert(name.into(), json!({ "path": path.display().to_string(), "sha256": hash }));
@@ -169,7 +213,7 @@ pub fn run(args: Vec<String>) -> Result<()> {
     if args.publish {
         ensure!(
             official,
-            "refusing --publish: this build is not official ({}). Build from clean sources with the static recipe from distro-builder and the launcher from tools/ginux",
+            "refusing --publish: this build is not official ({}). Build from clean sources with the static recipe from distro-builder and the Ginux tools built from tools/ginux",
             if dirty_names.is_empty() { "an input is not a static ELF".to_string() } else { format!("dirty: {}", dirty_names.join(", ")) }
         );
         check_publishable(&recipe_dir, &recipe_commit, &version)?;
@@ -179,12 +223,16 @@ pub fn run(args: Vec<String>) -> Result<()> {
     fs::create_dir_all(&out)?;
     let out = out.canonicalize()?;
     let stage_usr = out.join("stage-usr");
+    let stage_deb = out.join("stage-deb");
     let stage_local = out.join("stage-local");
-    for (dir, prefix) in [(&stage_usr, "/usr"), (&stage_local, "/usr/local")] {
-        stage(&recipe_bin, dir, prefix, &launcher, &reference, &catalog, &recipe_dir, &ginux_dir)?;
-        println!("staged   {} (prefix {prefix})", dir.display());
+    // The sudoers rule names the administrators' group: wheel everywhere but Debian and
+    // Ubuntu, whose group is sudo (install.sh switches the tarball's rule where only sudo exists).
+    for (dir, prefix, group) in [(&stage_usr, "/usr", "wheel"), (&stage_deb, "/usr", "sudo"), (&stage_local, "/usr/local", "wheel")] {
+        stage(&recipe_bin, &guard, dir, prefix, group, &ginux, &reference, &catalog, &recipe_dir, &ginux_dir)?;
+        println!("staged   {} (prefix {prefix}, sudoers group {group})", dir.display());
     }
     let usr = collect(&stage_usr)?;
+    let deb = collect(&stage_deb)?;
     let local = collect(&stage_local)?;
 
     // Assets.
@@ -217,7 +265,7 @@ pub fn run(args: Vec<String>) -> Result<()> {
     assets.push(rpm_name);
 
     let deb_name = format!("{PKG}_{v}-1_amd64.deb");
-    build_deb(&usr, v, mtime, &out.join(&deb_name))?;
+    build_deb(&deb, v, mtime, &out.join(&deb_name))?;
     assets.push(deb_name);
 
     let apk_name = format!("{PKG}-{v}-r0.x86_64.apk");
@@ -229,7 +277,6 @@ pub fn run(args: Vec<String>) -> Result<()> {
     fs::create_dir_all(out.join("aur"))?;
     fs::write(out.join("aur/PKGBUILD"), pkgbuild(v, &usr_tarball, &url, &usr_sha))?;
     fs::write(out.join("aur/.SRCINFO"), srcinfo(v, &usr_tarball, &url, &usr_sha))?;
-    fs::write(out.join("aur/recipe-pm.install"), aur_install())?;
     fs::create_dir_all(out.join("void/srcpkgs/recipe-pm"))?;
     fs::write(out.join("void/srcpkgs/recipe-pm/template"), void_template(v, &url, &usr_sha))?;
 
@@ -355,26 +402,51 @@ fn build_recipe(root: &Path) -> Result<(String, PathBuf, String)> {
     Ok((lines[n - 3].to_string(), PathBuf::from(lines[n - 2]), lines[n - 1].to_string()))
 }
 
-fn build_launcher(root: &Path, ginux_dir: &Path) -> Result<PathBuf> {
-    let target = root.join(".artifacts/recipe-release/ginux-target");
-    println!("building the Ginux launcher from tools/ginux into {}", target.display());
-    let triple = "x86_64-unknown-linux-gnu";
-    let status = Command::new("cargo")
-        .current_dir(ginux_dir)
-        .env("CARGO_TARGET_DIR", &target)
-        .args(["build", "-p", "ginux-init", "--target", triple, "--release"])
-        .status()
-        .context("running cargo")?;
-    ensure!(status.success(), "building the Ginux launcher failed; the same command is `make build` in tools/ginux, or pass --launcher FILE");
-    Ok(target.join(triple).join("release/ginux"))
+/// The five Ginux files the release ships.
+struct Ginux {
+    cli: PathBuf,
+    helper: PathBuf,
+    image: PathBuf,
+    runtime: PathBuf,
+    allocator: PathBuf,
 }
 
+impl Ginux {
+    /// Each file with its name in `--ginux-dir`, in [`GINUX_FILES`] order.
+    fn files(&self) -> [(&'static str, &Path); 5] {
+        [
+            (GINUX_FILES[0], &self.cli),
+            (GINUX_FILES[1], &self.helper),
+            (GINUX_FILES[2], &self.image),
+            (GINUX_FILES[3], &self.runtime),
+            (GINUX_FILES[4], &self.allocator),
+        ]
+    }
+}
+
+/// The Ginux tools built from tools/ginux exactly as OS builds build them
+/// (`distro_builder::recipe::ginux::tools`).
+fn build_ginux(root: &Path) -> Result<Ginux> {
+    println!("building the Ginux tools from tools/ginux (distro-builder's recipe::ginux::tools)");
+    let tools = distro_builder::recipe::ginux::tools(root)
+        .context("building the Ginux tools failed; fix that, or pass --ginux-dir DIR for an unofficial release")?;
+    Ok(Ginux {
+        cli: tools.cli.clone(),
+        helper: tools.helper.clone(),
+        image: tools.image.clone(),
+        runtime: tools.runtime.clone(),
+        allocator: tools.allocator.clone(),
+    })
+}
+
+/// The pinned compiler image: `local/recipe-compiler@sha256:<image_digest>` from
+/// bootstrap/product-ci.json, and that manifest digest.
 fn runtime_reference(recipe_dir: &Path) -> Result<(String, String)> {
     let path = recipe_dir.join("bootstrap/product-ci.json");
     let doc: serde_json::Value = serde_json::from_str(&fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?)?;
-    let sha = doc["image_sha256"].as_str().with_context(|| format!("{} has no image_sha256", path.display()))?;
-    ensure!(sha.len() == 64 && sha.chars().all(|c| c.is_ascii_hexdigit()), "image_sha256 in {} is not a sha256", path.display());
-    Ok((format!("oci:recipe-compiler@sha256:{sha}"), sha.to_string()))
+    let digest = doc["image_digest"].as_str().with_context(|| format!("{} has no image_digest", path.display()))?;
+    ensure!(digest.len() == 64 && digest.chars().all(|c| c.is_ascii_hexdigit()), "image_digest in {} is not a sha256", path.display());
+    Ok((format!("local/recipe-compiler@sha256:{digest}"), digest.to_string()))
 }
 
 fn gh(args: &[&str]) -> Result<std::process::Output> {
@@ -386,9 +458,9 @@ fn check_runtime_release(short: &str) -> Result<()> {
     let out = gh(&["release", "view", &tag, "-R", PREBUILT_REPO, "--json", "assets"])?;
     ensure!(out.status.success(), "release {tag} does not exist in {PREBUILT_REPO}; `cargo xtask prebuilt publish-runtime` publishes it ({})", String::from_utf8_lossy(&out.stderr).trim());
     let doc: serde_json::Value = serde_json::from_slice(&out.stdout)?;
-    let has = doc["assets"].as_array().is_some_and(|a| a.iter().any(|x| x["name"] == "rootfs.tar.zst"));
-    ensure!(has, "release {tag} in {PREBUILT_REPO} has no rootfs.tar.zst; `cargo xtask prebuilt publish-runtime` publishes it");
-    println!("runtime  {tag} holds rootfs.tar.zst");
+    let has = doc["assets"].as_array().is_some_and(|a| a.iter().any(|x| x["name"] == "image.oci.tar.zst"));
+    ensure!(has, "release {tag} in {PREBUILT_REPO} has no image.oci.tar.zst; `cargo xtask prebuilt publish-runtime` publishes it");
+    println!("runtime  {tag} holds image.oci.tar.zst");
     Ok(())
 }
 
@@ -410,19 +482,31 @@ fn check_publishable(recipe_dir: &Path, commit: &str, version: &str) -> Result<(
 // ---- staging ------------------------------------------------------------------------------
 
 #[allow(clippy::too_many_arguments)]
-fn stage(recipe: &Path, dir: &Path, prefix: &str, launcher: &Path, reference: &str, catalog: &Path, recipe_dir: &Path, ginux_dir: &Path) -> Result<()> {
+fn stage(recipe: &Path, guard: &Path, dir: &Path, prefix: &str, group: &str, ginux: &Ginux, reference: &str, catalog: &Path, recipe_dir: &Path, ginux_dir: &Path) -> Result<()> {
     fs::create_dir_all(dir)?;
+    // No image layout: the runtime image is downloaded and imported on first use.
     let out = Command::new(recipe)
         .args(["runtime", "stage", "--root"])
         .arg(dir)
-        .args(["--prefix", prefix, "--launcher"])
-        .arg(launcher)
+        .args(["--prefix", prefix])
+        .arg("--ginux-cli")
+        .arg(&ginux.cli)
+        .arg("--ginux-helper")
+        .arg(&ginux.helper)
+        .arg("--ginux-image")
+        .arg(&ginux.image)
+        .arg("--ginux-runtime")
+        .arg(&ginux.runtime)
+        .arg("--ginux-allocator")
+        .arg(&ginux.allocator)
+        .arg("--recipe-guard")
+        .arg(guard)
         .args(["--reference", reference, "--catalog"])
         .arg(catalog)
-        .arg("--apparmor")
+        .args(["--sudoers", group])
         .output()
         .with_context(|| format!("running {}", recipe.display()))?;
-    ensure!(out.status.success(), "`recipe runtime stage` failed ({}): {}; the recipe must be the version that has `runtime stage --apparmor` (tools/recipe commit edee1b9 or later)", out.status, String::from_utf8_lossy(&out.stderr).trim());
+    ensure!(out.status.success(), "`recipe runtime stage` failed ({}): {}; the recipe must be the version that stages the public Ginux lifecycle (`runtime stage --ginux-cli ... --sudoers GROUP`)", out.status, String::from_utf8_lossy(&out.stderr).trim());
 
     let p = dir.join(prefix.trim_start_matches('/'));
     fs::create_dir_all(p.join("bin"))?;
@@ -458,7 +542,7 @@ enum Kind {
 }
 
 /// One archive entry. Owners are always root; modes are normalised (dirs 0755, files 0644,
-/// executables 0755); `mtime` is the source commit time.
+/// executables 0755, the sudoers rule 0440); `mtime` is the source commit time.
 #[derive(Clone)]
 struct Item {
     path: String,
@@ -493,7 +577,9 @@ fn collect(dir: &Path) -> Result<Vec<Item>> {
             } else {
                 use std::os::unix::fs::PermissionsExt;
                 let exec = meta.permissions().mode() & 0o111 != 0;
-                out.push(Item { path, kind: Kind::File(fs::read(entry.path())?), mode: if exec { 0o755 } else { 0o644 }, mtime: 0 });
+                // sudo ignores a rule file others could change; 0440 is its own mode.
+                let mode = if path == SUDOERS { 0o440 } else if exec { 0o755 } else { 0o644 };
+                out.push(Item { path, kind: Kind::File(fs::read(entry.path())?), mode, mtime: 0 });
             }
         }
         Ok(())
@@ -598,20 +684,9 @@ fn xz(data: &[u8]) -> Result<Vec<u8>> {
     Ok(enc.finish()?)
 }
 
-fn load_profile_sh(indent: &str) -> String {
-    format!(
-        "{indent}if [ -d /sys/kernel/security/apparmor ] && command -v apparmor_parser >/dev/null 2>&1; then\n{indent}    apparmor_parser -r {PROFILE} || true\n{indent}fi\n"
-    )
-}
-
-fn unload_profile_sh(indent: &str) -> String {
-    format!(
-        "{indent}if [ -d /sys/kernel/security/apparmor ] && command -v apparmor_parser >/dev/null 2>&1 && [ -f {PROFILE} ]; then\n{indent}    apparmor_parser -R {PROFILE} || true\n{indent}fi\n"
-    )
-}
-
+/// The directories the package owns: Recipe's own and Ginux's (`usr/libexec/ginux`, `usr/lib64/ginux`).
 fn is_recipe_dir(path: &str) -> bool {
-    path.split('/').any(|c| c.starts_with("recipe"))
+    path.split('/').any(|c| c.starts_with("recipe") || c == "ginux")
 }
 
 // ---- RPM ----------------------------------------------------------------------------------
@@ -647,8 +722,6 @@ fn build_rpm(usr: &[Item], v: &str, mtime: u64, out: &Path) -> Result<()> {
             }
         }
     }
-    b.post_install_script(rpm::Scriptlet::new(format!("{}exit 0\n", load_profile_sh(""))));
-    b.pre_uninstall_script(rpm::Scriptlet::new(format!("if [ \"$1\" = 0 ]; then\n{}fi\nexit 0\n", unload_profile_sh("    "))));
     b.build()?.write_file(out)?;
     Ok(())
 }
@@ -673,15 +746,11 @@ fn build_deb(usr: &[Item], v: &str, mtime: u64, out: &Path) -> Result<()> {
         "Package: {PKG}\nVersion: {v}-1\nArchitecture: amd64\nMaintainer: {MAINTAINER}\nInstalled-Size: {installed_kib}\nSection: admin\nPriority: optional\nHomepage: {HOMEPAGE}\nDescription: {SUMMARY}\n{long}"
     );
     let conffiles: String = CONFFILES.iter().map(|c| format!("/{c}\n")).collect();
-    let postinst = format!("#!/bin/sh\nset -e\ncase \"$1\" in\n    configure)\n{}        ;;\nesac\nexit 0\n", load_profile_sh("        "));
-    let prerm = format!("#!/bin/sh\nset -e\ncase \"$1\" in\n    remove)\n{}        ;;\nesac\nexit 0\n", unload_profile_sh("        "));
     let mut control_items = vec![
         dir_item("", mtime),
         bytes_item("control", control.into_bytes(), false, mtime),
         bytes_item("md5sums", md5sums.into_bytes(), false, mtime),
         bytes_item("conffiles", conffiles.into_bytes(), false, mtime),
-        bytes_item("postinst", postinst.into_bytes(), true, mtime),
-        bytes_item("prerm", prerm.into_bytes(), true, mtime),
     ];
     let control_tar = xz(&tar_bytes(&mut control_items, "./", false, true, mtime)?)?;
     let data_tar = xz(&tar_bytes(&mut data_items, "./", false, true, mtime)?)?;
@@ -707,14 +776,7 @@ fn build_apk(usr: &[Item], v: &str, mtime: u64, out: &Path) -> Result<()> {
     let pkginfo = format!(
         "# Generated by cargo xtask release recipe\npkgname = {PKG}\npkgver = {v}-r0\npkgdesc = {SUMMARY}\nurl = {HOMEPAGE}\nbuilddate = {mtime}\npackager = {MAINTAINER}\nsize = {size}\narch = x86_64\norigin = {PKG}\nlicense = {LICENSE}\ndatahash = {datahash}\n"
     );
-    let post = format!("#!/bin/sh\n{}exit 0\n", load_profile_sh(""));
-    let pre = format!("#!/bin/sh\n{}exit 0\n", unload_profile_sh(""));
-    let mut control_items = vec![
-        bytes_item(".PKGINFO", pkginfo.into_bytes(), false, mtime),
-        bytes_item(".post-install", post.clone().into_bytes(), true, mtime),
-        bytes_item(".post-upgrade", post.into_bytes(), true, mtime),
-        bytes_item(".pre-deinstall", pre.into_bytes(), true, mtime),
-    ];
+    let mut control_items = vec![bytes_item(".PKGINFO", pkginfo.into_bytes(), false, mtime)];
     // Sorted order puts .PKGINFO first; abuild cuts the end-of-archive blocks of this tar only.
     let control_tar = tar_bytes(&mut control_items, "", false, false, mtime)?;
     let mut apk = gzip(&control_tar)?;
@@ -778,6 +840,8 @@ while IFS= read -r f; do
     if [ -L "$f" ]; then
         rm -f "$dest$p"
         cp -P "$f" "$dest$p"
+    elif [ "$p" = /@SUDOERS@ ]; then
+        install -m 0440 "$f" "$dest$p"
     elif [ -x "$f" ]; then
         install -m 0755 "$f" "$dest$p"
     else
@@ -794,27 +858,33 @@ printf 'f %s\n' "$manifest" >> "$list"
 LC_ALL=C sort -u "$list" > "$dest$manifest"
 echo "installed $(grep -c '^f ' "$dest$manifest") files; manifest: $dest$manifest"
 
-if [ -z "$dest" ] && [ -d /sys/kernel/security/apparmor ] && command -v apparmor_parser >/dev/null 2>&1; then
-    if apparmor_parser -r @PROFILE@; then
-        echo "loaded the AppArmor profile @PROFILE@"
-    else
-        echo "WARNING: could not load the AppArmor profile @PROFILE@." >&2
-        echo "         Ordinary users then need 'sysctl kernel.apparmor_restrict_unprivileged_userns=0'" >&2
-        echo "         (Ubuntu 23.10 and later), or must run recipe as root." >&2
-    fi
+# The sudoers rule names the administrators' group wheel; where only sudo exists
+# (Debian, Ubuntu) the rule names sudo instead. A file name with a dot is one sudo skips.
+rule=$dest/@SUDOERS@
+group=wheel
+if ! getent group wheel >/dev/null 2>&1 && getent group sudo >/dev/null 2>&1; then
+    group=sudo
+    sed 's/wheel/sudo/g' "$rule" > "$rule.new"
+    chmod 0440 "$rule.new"
+    mv -f "$rule.new" "$rule"
 fi
 
-cat <<'EOF'
+cat <<EOF
 
 Recipe is installed. To use it in this shell now:
     . /etc/profile.d/recipe.sh
 or open a new login shell. Then try: recipe list
 
+Recipe builds inside Ginux, whose helper runs as root: root and the members of
+the group $group (the sudoers rule /@SUDOERS@) can use it. Recipes that start no
+program also run for everyone else.
+
 The first recipe run downloads the runtime image (about 330 MB) into
-$XDG_CACHE_HOME/recipe/images (default ~/.cache/recipe/images; root: /root/.cache/recipe).
+\$XDG_CACHE_HOME/recipe/images (default ~/.cache/recipe/images; root: /root/.cache/recipe)
+and imports it into Ginux under /var/lib/recipe/ginux.
 EOF
 "##,
-        &[("@MANIFEST@", MANIFEST), ("@PROFILE@", PROFILE)],
+        &[("@MANIFEST@", MANIFEST), ("@SUDOERS@", SUDOERS)],
     )
 }
 
@@ -838,10 +908,6 @@ if [ ! -f "$dest$manifest" ]; then
     exit 1
 fi
 
-if [ -z "$dest" ] && [ -d /sys/kernel/security/apparmor ] && command -v apparmor_parser >/dev/null 2>&1 && [ -f @PROFILE@ ]; then
-    apparmor_parser -R @PROFILE@ || true
-fi
-
 list=$(mktemp)
 trap 'rm -f "$list"' EXIT
 cp "$dest$manifest" "$list"
@@ -863,10 +929,11 @@ cat <<'EOF'
 recipe-pm is removed. Left in place on purpose:
     software installed with recipe: /var/lib/recipe (for everyone) and ~/.local/share/recipe (per user)
     downloaded runtime images:      ~/.cache/recipe (root: /root/.cache/recipe)
+    images imported into Ginux:     /var/lib/recipe/ginux and /run/recipe/ginux (root-owned)
 Delete those folders yourself if you want them gone.
 EOF
 "##,
-        &[("@MANIFEST@", MANIFEST), ("@PROFILE@", PROFILE)],
+        &[("@MANIFEST@", MANIFEST)],
     )
 }
 
@@ -879,16 +946,20 @@ Recipe, the package manager that builds software inside Ginux, for any x86_64 Li
 Install (as root):
     sudo sh install.sh
 It copies root/ into /usr/local (and /etc/profile.d/recipe.sh), writes the list of
-installed files to {MANIFEST}, and on hosts with AppArmor loads {PROFILE}.
+installed files to {MANIFEST}. Recipe's guard goes to /usr/libexec/recipe, Ginux's root-run
+tools to /usr/libexec/ginux and /usr/lib64/ginux, and the sudoers rule /{SUDOERS} lets the
+group wheel (sudo on Debian and Ubuntu, picked by install.sh) run the guard (which allows
+only Recipe's instance verbs on recipe-<uid>-* instances, then runs Ginux's helper) on
+Recipe's own roots.
 Remove it with: sudo sh uninstall.sh
 
 The first recipe run downloads the runtime image (about 330 MB) to
-$XDG_CACHE_HOME/recipe/images. Nothing else is fetched at install time.
+$XDG_CACHE_HOME/recipe/images and imports it into Ginux (/var/lib/recipe/ginux).
+Nothing else is fetched at install time.
 
-Ordinary users can install software for themselves; root installs for everyone.
-Ubuntu 23.10 and later restrict user namespaces: install.sh loads an AppArmor profile
-for the launcher. Without it, ordinary users need
-kernel.apparmor_restrict_unprivileged_userns=0 or must run recipe as root.
+Root installs software for everyone; the members of the administrators' group install
+it for themselves too. Every build that starts a program runs in Ginux through its
+root helper, which other users cannot run; recipes that start no program run for anyone.
 
 Homepage: {HOMEPAGE}
 Licenses: MIT OR Apache-2.0 (recipe); Ginux's own licenses are in root/usr/local/share/licenses/recipe-pm/ginux.
@@ -906,8 +977,7 @@ pkgdesc='@SUMMARY@'
 arch=('x86_64')
 url='@HOMEPAGE@'
 license=('MIT' 'Apache-2.0')
-install=recipe-pm.install
-backup=('etc/profile.d/recipe.sh' 'etc/apparmor.d/recipe-ginux')
+backup=('etc/profile.d/recipe.sh' 'etc/sudoers.d/recipe-ginux')
 options=(!strip !debug)
 source=('@FILE@::@URL@')
 sha256sums=('@SHA@')
@@ -929,28 +999,19 @@ fn srcinfo(v: &str, file: &str, url: &str, sha: &str) -> String {
 \tpkgver = @V@
 \tpkgrel = 1
 \turl = @HOMEPAGE@
-\tinstall = recipe-pm.install
 \tarch = x86_64
 \tlicense = MIT
 \tlicense = Apache-2.0
 \toptions = !strip
 \toptions = !debug
 \tbackup = etc/profile.d/recipe.sh
-\tbackup = etc/apparmor.d/recipe-ginux
+\tbackup = etc/sudoers.d/recipe-ginux
 \tsource = @FILE@::@URL@
 \tsha256sums = @SHA@
 
 pkgname = recipe-pm
 ",
         &[("@SUMMARY@", SUMMARY), ("@V@", v), ("@HOMEPAGE@", HOMEPAGE), ("@FILE@", file), ("@URL@", url), ("@SHA@", sha)],
-    )
-}
-
-fn aur_install() -> String {
-    format!(
-        "post_install() {{\n{load}}}\n\npost_upgrade() {{\n    post_install\n}}\n\npre_remove() {{\n{unload}}}\n",
-        load = load_profile_sh("    "),
-        unload = unload_profile_sh("    "),
     )
 }
 
@@ -969,7 +1030,7 @@ homepage="@HOMEPAGE@"
 distfiles="@URL@"
 checksum=@SHA@
 nostrip=yes
-conf_files="/etc/profile.d/recipe.sh /etc/apparmor.d/recipe-ginux"
+conf_files="/etc/profile.d/recipe.sh /etc/sudoers.d/recipe-ginux"
 
 do_install() {
 	vmkdir usr
@@ -992,13 +1053,15 @@ fn release_notes(v: &str, official: bool) -> String {
         r##"# recipe-pm @V@
 @UNOFFICIAL@
 Recipe is the package manager that builds software inside Ginux, for any x86_64 Linux.
-The package holds the static `recipe` command, the Ginux launcher, the official recipe
-source and the manual pages. The command stays `recipe`; the package is `recipe-pm`.
+The package holds the static `recipe` command, Recipe's guard, the Ginux tools (the `ginux` CLI,
+the privileged helper, image tool, runtime and allocator), a sudoers rule for the administrators'
+group, the official recipe source and the manual pages. The command stays `recipe`; the
+package is `recipe-pm`.
 
 The runtime image (about 330 MB) is downloaded on the first recipe run into
-`$XDG_CACHE_HOME/recipe/images` (default `~/.cache/recipe/images`). No package contains it.
-Ordinary users install software for themselves (in `~/.local/share/recipe`); root installs
-for everyone (in `/var/lib/recipe`).
+`$XDG_CACHE_HOME/recipe/images` (default `~/.cache/recipe/images`) and imported into Ginux
+under `/var/lib/recipe/ginux`. No package contains it. Root installs software for everyone
+(in `/var/lib/recipe`); administrators also for themselves (in `~/.local/share/recipe`).
 
 ## Install
 
@@ -1014,12 +1077,21 @@ for everyone (in `/var/lib/recipe`).
 
 Then open a new login shell (or `. /etc/profile.d/recipe.sh`) and run `recipe list`.
 
-## Ubuntu 23.10 and later (AppArmor)
+## Who can run Ginux
 
-These restrict unprivileged user namespaces, which Ginux uses for ordinary users. The
-packages and `install.sh` load the profile `/etc/apparmor.d/recipe-ginux` for the launcher.
-If it cannot be loaded, ordinary users need `kernel.apparmor_restrict_unprivileged_userns=0`
-or must run `recipe` as root.
+Every build that starts a program runs in a Ginux instance, created and started by Ginux's
+helper as root. `sudo` runs only Recipe's guard, `/usr/libexec/recipe/recipe-ginux-guard`:
+`/etc/sudoers.d/recipe-ginux` lets the administrators' group run it on Recipe's own roots
+without a password (`wheel` in the RPM, apk, AUR and Void packages, `sudo` in the deb, and
+whichever of the two exists for `install.sh`). The guard allows only Recipe's instance verbs
+on instances named `recipe-<uid>-*`, re-renders the instance config, accepts for non-root callers only
+images listed in the root-owned `/usr/libexec/recipe/runtime-images` (no `import-image`: the installer
+imports the image as root) and clears the environment, then runs the helper: a passwordless sandbox
+for group members from trusted images, which is not unconditionally harmless (see Recipe's
+`docs/runtime-limits.md`, "What a shared host still exposes").
+Other users run only recipes that start no program; root needs no rule. The package installs
+the guard at `/usr/libexec/recipe` and Ginux's root-run tools at `/usr/libexec/ginux` and
+`/usr/lib64/ginux` whatever its prefix.
 
 ## Files
 

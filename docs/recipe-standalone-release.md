@@ -2,8 +2,86 @@
 
 Plan of 2026-11-13; decisions taken the same day (end of file).
 
+## Update of 2026-11-23: the public-lifecycle cutover changes the privilege story
+
+Written, never built or run. Recipe now runs recipes through Ginux's public
+lifecycle (design `tools/recipe/docs/ginux-cutover-design.md`, plan
+`tools/recipe/docs/ginux-public-lifecycle-migration.md`, section 6), not the
+downstream `ginux launch`. For a standalone release that means:
+
+- **There is no ordinary-user path and no AppArmor profile.** The
+  user-namespace launch (Ginux `ccc492a2`, `7b9dec91`) that let an ordinary user
+  install on Fedora and Ubuntu is gone; so is `recipe runtime stage --apparmor`,
+  `data/apparmor-ginux`, the AppArmor load in `install.sh` and the `.deb`
+  `postinst`. Every privileged step of a Ginux run is the Ginux helper run as
+  root; `sudo` runs only Recipe's guard, which runs the helper.
+- **The sudoers requirement.** To run anything in Ginux a user must be root or
+  a member of the group named by the rule `recipe runtime stage --sudoers GROUP`
+  writes to `/etc/sudoers.d/recipe-ginux` (mode 0440; the rule lets `%GROUP` run
+  `/usr/libexec/recipe/recipe-ginux-guard --protocol 1 --state-root /var/lib/recipe/ginux
+  --run-root /run/recipe/ginux *` as root without a password). The rule names the
+  guard, never the helper: the guard (root-owned, 0755, in a root-owned
+  directory) allows only Recipe's verbs (`import`, `inject`, `start`, `status`,
+  `stop`, `delete`, `extract`) on instances named `recipe-<uid>-*`, re-renders
+  the instance config Recipe imports from validated fields, clears the
+  environment, and for a caller other than root accepts an image only if its
+  exact reference is in the root-owned allowlist
+  `/usr/libexec/recipe/runtime-images` (written by `recipe runtime stage`,
+  `sudo recipe runtime fetch` and `install.sh`); then it runs the helper.
+  `import-image` is not available through the guard: `install.sh` imports the
+  image as root (`sudo recipe runtime fetch`), and a non-root run without an
+  imported image stops and says to run that command. A group member can
+  therefore run Recipe-shaped sandbox instances from trusted images without a
+  password. That is not a guarantee of harmlessness to the host:
+  the code that unpacks and prepares a trusted image runs as root and follows
+  symlinks in it (R13, R14: a hostile image could delete host files; the
+  allowlist keeps untrusted images away, but root callers and the OS builder
+  still use that code), every user's workload runs as the same host uid 65534
+  (R15), and there are no per-uid instance, disk or cache caps (the free-space
+  watchdog and the byte bounds are Recipe's, in the client). See
+  `tools/recipe/docs/runtime-limits.md`, "What a shared host still exposes". `install.sh` (already run as root) writes the rule for
+  the group it picks: `%wheel` on Fedora, Rocky, LevitateOS and AcornOS, `%sudo`
+  on Ubuntu. Other users cannot run a recipe in Ginux. Recipes that start no program still run on the host for
+  everyone (`--execution auto`). Option A of the cutover design (decided by the
+  owner); options B (a `recipe` group) and C (root only) were not taken.
+- **What a release now installs** (all as root): the `ginux` CLI at
+  `libexec/recipe/ginux`, Recipe's guard at
+  `/usr/libexec/recipe/recipe-ginux-guard`, the helper, image tool and runtime at
+  `/usr/libexec/ginux/{ginux-helper,ginux-image,ginux-runtime}`, the allocator
+  at `/usr/lib64/ginux/libginux_allocator.so`, the sudoers rule, and the image
+  layout downloaded as `image.oci.tar.zst` (identity: the OCI
+  manifest digest; the installer's `sudo recipe runtime fetch` imports it once
+  per host into the root-owned state root `/var/lib/recipe/ginux`, about 1.3 GB
+  more on disk, and lists it in `/usr/libexec/recipe/runtime-images`; root's
+  first run does the same, a non-root run does not import). The files must be
+  root-owned and not writable by anyone else: a user-writable copy reached
+  through the passwordless rule would be a root escalation. `GINUX_BIN`,
+  `GINUX_ROOT*` and `RECIPE_*` replace nothing the old way: Recipe stops on the
+  old variables and names the new ones.
+- **Supported hosts, honestly.** Rocky/RHEL 10 is the only host Ginux itself
+  packages for (an RPM). Fedora 44 and Ubuntu 24.04 are Recipe's own packaging
+  (the CLI and image tool are to be built static musl so one build runs on both,
+  not yet checked; the helper needs GNU `mv --no-copy`, `cp --reflink`,
+  `script -E never`, `flock`, `gawk`, `stat -c`, all present on both), and
+  **neither has been run on the public lifecycle**: the verification pass must
+  install on each and run a recipe. SELinux on Fedora (the helper runs
+  unconfined through sudo) and `sudo`'s `use_pty` with binary stdin/stdout are
+  unproven. AcornOS needs `sudo`, util-linux, GNU coreutils and gawk in its
+  image, which sits badly with "small and strict". The kernel floor is
+  unestablished.
+- **Accepted regressions that ship with it**, stated in
+  `tools/recipe/docs/runtime-limits.md` and the release notes: no storage limit
+  inside a run, network grants per port (programs can reach any address on a
+  granted port, no connection or byte cap), live roots copied, no hard links
+  through the instance, each run costs a full image expansion where the state
+  root has no reflinks.
+
+The findings below are history of the retired runtime. Where they speak of
+user namespaces, AppArmor, an ordinary user's install, `/usr/libexec/recipe/ginux`
+as the launcher or `rootfs.tar`, they no longer apply.
+
 Status (2026-11-13), all compile-checked, none of it built into an image,
-run under Ginux or published:
+run under Ginux or published (retired runtime):
 - Done: Recipe step 1 and step 2 (tools/recipe `540e9c1`). `recipe runtime
   stage|fetch|status` exist, runtime paths resolve against the install
   prefix, and the image downloads on first use (checked against a local
@@ -86,17 +164,18 @@ needs three things that only the OS image ships today. They are put there by
 
 | What | Where Recipe looks | Who provides it today |
 |---|---|---|
-| The Ginux launcher | `/usr/libexec/recipe/ginux` (`tools/recipe/src/runtime.rs` `LAUNCHER`), or `GINUX_BIN` | the builder, built from `tools/ginux` at its pin |
-| The runtime image, a pinned Rocky rootfs tar | `/usr/share/recipe/runtime/rootfs.tar` with `root-reference`, or `GINUX_ROOTFS`, or `$XDG_CACHE_HOME/recipe/images/<digest>.tar` (`runtime.rs` `rootfs_path`) | the builder, from `recipe-image` (images built here are 429 MB to 1.2 GB) |
+| The Ginux files (2026-11-23) | the `ginux` CLI at `/usr/libexec/recipe/ginux` or `RECIPE_GINUX`; the helper, image tool, runtime and allocator root-owned at `/usr/libexec/ginux`, `/usr/lib64/ginux`; the sudoers rule `/etc/sudoers.d/recipe-ginux` | the builder, built from `tools/ginux` at its pin; `recipe runtime stage` lays them out |
+| The runtime image, a pinned Rocky OCI image layout | `/usr/share/recipe/runtime/compiler.oci.tar` with `root-reference`, or `RECIPE_IMAGE_LAYOUT` with `RECIPE_IMAGE`, or `$XDG_CACHE_HOME/recipe/images/<manifest digest>.oci.tar` (`runtime.rs` `layout_path`) | the builder, from `recipe-image` (images built here are 429 MB to 1.2 GB) |
 | The official source of recipes | `/usr/share/recipe/sources/levitate.toml` and a copy of `levitate/index.json` (`src/sources.rs` `SHIPPED`) | the builder, from `recipes/` at its pin |
 | `PATH` for installed commands | `/etc/profile.d/recipe.sh` | the builder |
 
 Read from the code, not run: on a host with only the package, every recipe run
-stops at startup with "ginux launcher /usr/libexec/recipe/ginux is missing or
-inaccessible" (`backend.rs` `resolve_launcher`), and there is no official
+stops at startup with a message that names `RECIPE_GINUX` and the missing
+Ginux file (`ginux.rs` `Ginux::from_env`), and there is no official
 source to list from. You can only get further by hand, with
-`docs/setup-linux.md`: build Ginux, produce an image and set four environment
-variables.
+`docs/setup-linux.md`: build Ginux, produce an image and set the environment
+variables (since 2026-11-23: `RECIPE_GINUX`, `RECIPE_IMAGE`, `RECIPE_IMAGE_LAYOUT`
+and the worker).
 
 So the main work is to have **Recipe itself own its runtime**, so that a
 release can contain it. The builder would then use the same layout instead of
@@ -135,12 +214,13 @@ writing its own.
    `prebuilt publish`, see `docs/prebuilt-downloads.md`). This keeps each
    package small and keeps the image under its digest pin. The OS image keeps
    shipping the tar so that it works offline.
-3. **Privileges are settled on a foreign host.** `docs/setup-linux.md` says
-   the coordinator needs root for Ginux's chroot bootstrap. Upstream Ginux
-   says it runs as an ordinary process. The window's "For me" runs `recipe`
-   without the root helper. One run on a plain Fedora or Rocky host shows
-   which is true. If root is needed, installing "for me" needs the helper too,
-   and the docs must say so.
+3. **Privileges are settled on a foreign host (settled 2026-11-23).** The public
+   lifecycle needs root: every privileged step is the Ginux helper run through
+   `sudo`. A standalone host therefore needs the sudoers rule
+   (`recipe runtime stage --sudoers GROUP`, written by `install.sh` for the
+   group it picks) for any user who is not root, and the window's "For me"
+   needs it too; without it Recipe says to run as root or to have an
+   administrator install the rule (see the update at the top).
 4. **The profile snippet covers both cases.** The snippet that is shipped now
    already handles a system without recab. It moves into Recipe's runtime
    tree unchanged.
@@ -154,7 +234,12 @@ writing its own.
    `tools-<key16>` of `LevitateOS/prebuilt`, verified like an image build does, else
    a compile; `provenance.json` records the key in `recipe_prebuilt_key` and which of
    the three in `recipe_prebuilt_source`), builds `recipe-image` and `recipe-image` and the launcher at the Ginux pin, stages
-   the runtime tree, packs the formats of decision 2 (tarball, RPM, APK,
+   the runtime tree (since 2026-11-23: `--ginux-dir`, the five Ginux files
+   built from the fork, CLI and image tool built static musl so one build runs
+   on Fedora and Ubuntu, the image as an OCI layout whose release asset is
+   `image.oci.tar.zst`, and the sudoers rule; `CONFFILES` gains
+   `etc/sudoers.d/recipe-ginux` and loses `etc/apparmor.d/recipe-ginux`, and the
+   `.deb` `postinst` no longer loads AppArmor), packs the formats of decision 2 (tarball, RPM, APK,
    `.deb`; the AUR and Void build files get the new checksums), and publishes
    the GitHub release of `LevitateOS/recipe`. Products are built locally, not in CI
    (CI is for quick checks only). It must be reproducible and record its source
@@ -183,7 +268,7 @@ distro. Such recipes must say they are OS-only, and the standalone window and
 `recipe list` must not offer them. Every other recipe in the catalog is a
 self-contained program and fits a standalone release.
 
-## Step 3: what the Fedora run showed
+## Step 3: what the Fedora run showed (retired runtime, 2026-11-13)
 
 - **What works.** The prefix lookup found the launcher, reference and
   sources under `/usr/local`, and `recipe list` listed the catalog.
@@ -191,7 +276,8 @@ self-contained program and fits a standalone release.
 - **Root works.** `sudo -i recipe install ripgrep` installed and activated
   ripgrep 15.2.0 in 47 s, with the image download included, and root's
   `rg` runs.
-- **An ordinary user does not.** Ginux stops with "launch bootstrap
+- **An ordinary user does not (and since 2026-11-23 cannot, by design, without
+  the sudoers rule).** Ginux stopped with "launch bootstrap
   unavailable: chroot failed (host privilege required)". The launch uses
   plain `chroot(2)` (`tools/ginux/crates/ginux-init/src/launch.rs`), which
   needs `CAP_SYS_CHROOT`. "For me" installs therefore fail for every
@@ -233,7 +319,8 @@ self-contained program and fits a standalone release.
    the AUR `PKGBUILD` and the Void `xbps-src` template are new. The AUR and
    Void ones are recipes for those systems' own build tools, published to the
    AUR and proposed to void-packages, not files on the GitHub release.
-3. **Runtime image: downloaded on first use**, by digest from
+3. **Runtime image: downloaded by `sudo recipe runtime fetch`** (the installer
+   runs it; root's first run does too), by digest from
    `LevitateOS/prebuilt`, verified and cached in
    `$XDG_CACHE_HOME/recipe/images`. No package contains it. The OS images
    keep shipping the tar.

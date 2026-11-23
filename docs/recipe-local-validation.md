@@ -1,5 +1,15 @@
 # Local Recipe integration validation
 
+**Update 2026-11-23.** Everything below was measured on the retired downstream
+`ginux launch` runtime. Recipe now runs on Ginux's public lifecycle (the
+cutover, `tools/recipe/docs/ginux-cutover-design.md`); the cutover is written and
+**has never been run**, so none of the results below certifies it. The
+reproduction section after this note is the current way to run the suites; the
+verification pass (derive the catalog and two digests with a built fork binary,
+the e2e suites, a catalog install, one OS part build, standalone installs on
+Fedora 44 and Ubuntu 24.04) is described in
+`tools/recipe/docs/ginux-public-lifecycle-migration.md`, section 6.
+
 These results belong to the exact historical sources and artifacts named below.
 The [consolidated production-readiness queue](ginux-contribution-task-list.md)
 owns remaining work; [F03](ginux-contributions/f03-review.md) records later
@@ -84,20 +94,41 @@ cargo check --offline -p levitate-xtask -p distro-builder -p distro-contract \
   -p levitate-recipe -p acornos -p leviso --all-targets
 ```
 
-Ginux's native bootstrap needs the documented privileges. Run the coordinator
-and inherited channels with those privileges; wrapping only the launcher in
-plain `sudo` closes required descriptors. A representative actual combined run
-uses immutable copied artifacts so a parallel build cannot replace them:
+The public lifecycle needs root: every privileged step is the Ginux helper run
+as root, behind Recipe's guard, which `sudo` runs. Run the suites as root, or as a
+member of the group of the sudoers rule `recipe runtime stage --sudoers GROUP`
+wrote (it names `/usr/libexec/recipe/recipe-ginux-guard`, which must be installed
+root-owned; then export
+`RECIPE_GINUX_STATE_ROOT=/var/lib/recipe/ginux` and
+`RECIPE_GINUX_RUN_ROOT=/run/recipe/ginux`, the roots the rule pins; the guard
+allows no `import-image`, so when the test process is not root the e2e harness
+first runs `sudo env RECIPE_IMAGE=… RECIPE_IMAGE_LAYOUT=… recipe runtime fetch`
+once, which imports the image and lists it in the guard's allowlist: a
+precondition, see the header of `tests/e2e.rs`). The Ginux
+files must be root-owned at `/usr/libexec/ginux/` (and `/usr/lib64/ginux/`), or a
+root-owned wrapper must be named by `GINUX_INSTANCE_HELPER`; the preconditions of
+every suite are the header of `tools/recipe/tests/e2e.rs`. The fixtures use one
+state root, `/var/lib/recipe-e2e/shared`, so the compiler image is imported once;
+a few cases create small throwaway roots under `/var/lib/recipe-e2e/` and one
+(the partial console line) needs root. A representative combined run, with
+immutable copies of the artifacts so a parallel build cannot replace them:
 
 ```sh
 sudo -n env \
-  RECIPE_TEST_BIN=/tmp/recipe-t25-bin \
-  RECIPE_WORKER_BIN=/tmp/recipe-t25-bin \
-  GINUX_BIN=/tmp/ginux-t24-hidden-devices \
-  GINUX_ROOTFS="$PWD/.artifacts/ginux-env/prepared-image-git-musl/rootfs.tar" \
-  GINUX_ROOT=oci:recipe-compiler@sha256:9f220633d34efff68b1535375fbb4fa3c4c2c8843917859fd68d8f6edec27ff4 \
-  /tmp/recipe-t25-e2e --test-threads=6
+  RECIPE_TEST_BIN=/tmp/recipe-bin \
+  RECIPE_WORKER_BIN=/tmp/recipe-bin \
+  RECIPE_GINUX=/tmp/ginux-cli \
+  RECIPE_IMAGE_LAYOUT="$PWD/.artifacts/ginux-env/prepared-image-git-musl/image.oci.tar" \
+  RECIPE_IMAGE=local/recipe-compiler@sha256:MANIFEST_DIGEST_FROM_PROVENANCE \
+  /tmp/recipe-e2e --test-threads=6
 ```
+
+The old `GINUX_BIN`, `GINUX_ROOT` and `GINUX_ROOTFS` must not be set: Recipe
+refuses them. `MANIFEST_DIGEST_FROM_PROVENANCE` is `manifest_digest` in the
+image's `provenance.json`. No run of this form exists yet.
+
+Historical results of the retired runtime (the numbers, hashes and log names
+that follow identify a different runtime and are kept as record only):
 
 The initial complete132-case run finished **120passed/12failed** in1859.87s,
 `/tmp/recipe-t25-final-managed.log`; it is not a green full-suite result. Eleven
@@ -174,8 +205,9 @@ The actual host-consumer checks have no such warning. No VM boot is claimed.
 ## Working demonstration
 
 The committed [hello recipe](../tools/recipe/examples/hello.rhai) is the same
-current-contract example as the authoring guide. With the configured launcher
-and verified image, run:
+current-contract example as the authoring guide. With the Ginux CLI, the sudoers
+rule or root, and the verified image (`RECIPE_GINUX`, `RECIPE_IMAGE`,
+`RECIPE_IMAGE_LAYOUT`), run:
 
 ```sh
 recipe install tools/recipe/examples/hello.rhai \
